@@ -9,10 +9,8 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;height:100vh;overflow:hidden;background:#36393f}
 .container{display:flex;height:100vh}
-.sidebar{width:240px;background:#2f3136;display:flex;flex-direction:column;border-right:1px solid #202225}
-.server-header{height:48px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #202225;color:#fff;font-weight:600;font-size:15px}
-.settings-btn{background:none;border:none;color:#96989d;cursor:pointer;font-size:18px;padding:6px 8px;border-radius:4px;transition:all .2s}
-.settings-btn:hover{background:#3a3c42;color:#fff}
+.sidebar{width:240px;background:#2f3136;display:flex;flex-direction:column}
+.server-header{height:48px;padding:0 16px;display:flex;align-items:center;border-bottom:1px solid #202225;color:#fff;font-weight:600;font-size:15px}
 .channels{flex:1;overflow-y:auto;padding:8px}
 .channel-section{margin-bottom:16px}
 .section-header{color:#96989d;font-size:12px;font-weight:600;text-transform:uppercase;margin-bottom:4px;padding:0 8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
@@ -25,6 +23,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 .close-dm{opacity:0;background:none;border:none;color:#96989d;cursor:pointer;font-size:16px;transition:opacity .2s}
 .channel:hover .close-dm{opacity:1}
 .close-dm:hover{color:#ed4245}
+.users-section{border-top:1px solid #202225;max-height:300px;overflow-y:auto}
+.users-section-header{padding:8px 12px;color:#96989d;font-size:12px;font-weight:600}
+.role-header{font-size:11px;font-weight:600;text-transform:uppercase;padding:8px 12px 4px}
+.owner-header{color:#e74c3c}
+.admin-header{color:#faa61a}
+.vip-header{color:#f47fff}
+.online-header{color:#96989d}
+.user-item{padding:6px 12px;color:#96989d;font-size:13px;display:flex;align-items:center;justify-content:space-between;border-radius:4px;margin:0 4px;transition:background .15s}
+.user-item:hover{background:#3a3c42}
+.user-name{display:flex;align-items:center;gap:6px}
+.user-name::before{content:'●';color:#3ba55d;font-size:8px}
+.badge{font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;color:#fff}
+.badge-owner{background:linear-gradient(135deg,#e74c3c,#c0392b)}
+.badge-admin{background:linear-gradient(135deg,#faa61a,#ff8c00)}
+.badge-vip{background:linear-gradient(135deg,#f47fff,#ff6ec7)}
+.dm-btn{opacity:0;background:#5865f2;color:#fff;border:none;padding:3px 8px;border-radius:3px;font-size:10px;cursor:pointer;transition:opacity .2s}
+.user-item:hover .dm-btn{opacity:1}
 .user-area{height:52px;background:#292b2f;padding:0 8px;display:flex;align-items:center;cursor:pointer;transition:background .2s}
 .user-area:hover{background:#2a2d31}
 .user-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;margin-right:8px;font-size:14px;position:relative}
@@ -88,24 +103,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 .send-btn{background:#5865f2;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-weight:500;margin-left:8px;transition:background .2s}
 .send-btn:hover{background:#4752c4}
 .send-btn:disabled{background:#4e5058;cursor:not-allowed}
-.right-sidebar{width:240px;background:#2f3136;border-left:1px solid #202225;display:flex;flex-direction:column}
-.right-sidebar-header{height:48px;padding:0 16px;display:flex;align-items:center;border-bottom:1px solid #202225;color:#96989d;font-size:12px;font-weight:600;text-transform:uppercase}
-.members-list{flex:1;overflow-y:auto;padding:8px}
-.member-role-section{margin-bottom:16px}
-.member-role-header{font-size:11px;font-weight:600;text-transform:uppercase;padding:4px 8px;margin-bottom:4px}
-.member-role-header.owner{color:#e74c3c}
-.member-role-header.admin{color:#faa61a}
-.member-role-header.vip{color:#f47fff}
-.member-role-header.online{color:#96989d}
-.member-item{padding:6px 8px;color:#dcddde;font-size:13px;display:flex;align-items:center;gap:8px;border-radius:4px;margin:2px 0;transition:background .15s;cursor:pointer}
-.member-item:hover{background:#3a3c42}
-.member-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:14px;flex-shrink:0;position:relative}
-.member-status{position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:#3ba55d;border:2px solid #2f3136}
-.member-info{flex:1;min-width:0}
-.member-username{font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.member-username.owner{color:#e74c3c}
-.member-username.admin{color:#faa61a}
-.member-username.vip{color:#f47fff}
 .notifs{position:fixed;top:16px;right:16px;z-index:1000;display:flex;flex-direction:column;gap:8px;max-width:380px;pointer-events:none}
 .notifs>*{pointer-events:all}
 .notif{background:#2f3136;border:1px solid #202225;border-radius:8px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,.4);animation:slideIn .3s}
@@ -119,6 +116,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 .notif-accept:hover{background:#2d8659}
 .notif-decline{background:#ed4245;color:#fff}
 .notif-decline:hover{background:#c93b3e}
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-track{background:#2f3136}
+::-webkit-scrollbar-thumb{background:#202225;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#1a1c1f}
+#loginOverlay{position:fixed;inset:0;z-index:2000;background:linear-gradient(135deg,#1a1c20 0%,#2f3136 50%,#1a1c20 100%);display:flex;align-items:center;justify-content:center;flex-direction:column}
+.login-title{font-family:'Great Vibes',cursive;font-size:72px;color:#fff;margin-bottom:30px;text-shadow:0 0 20px rgba(88,101,242,.5),0 0 40px rgba(88,101,242,.3);animation:glow 2s ease-in-out infinite}
+@keyframes glow{0%,100%{text-shadow:0 0 20px rgba(88,101,242,.5),0 0 40px rgba(88,101,242,.3)}50%{text-shadow:0 0 30px rgba(88,101,242,.7),0 0 60px rgba(88,101,242,.5)}}
+#loginCard{width:320px;background:#2f3136;border:1px solid #202225;border-radius:8px;padding:24px;color:#fff;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+#loginCard h2{margin-bottom:16px;font-size:20px}
+#pwdInput{width:100%;padding:12px;border-radius:6px;border:none;background:#40444b;color:#fff;font-size:14px;transition:box-shadow .2s}
+#pwdInput:focus{outline:none;box-shadow:0 0 0 2px #5865f2}
+#loginBtn{width:100%;margin-top:12px;padding:12px;border:none;border-radius:6px;background:#5865f2;color:#fff;cursor:pointer;font-weight:600;font-size:14px;transition:background .2s}
+#loginBtn:hover{background:#4752c4}
+#loginError{margin-top:10px;color:#ed4245;font-size:13px;min-height:20px}
 .empty{text-align:center;color:#72767d;padding:12px;font-size:12px}
 .modal-overlay{position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center}
 .modal-overlay.show{display:flex}
@@ -128,29 +139,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 .modal-close{background:rgba(255,255,255,.2);border:none;color:#fff;font-size:18px;cursor:pointer;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .2s}
 .modal-close:hover{background:rgba(255,255,255,.3)}
 .modal-body{padding:16px;overflow-y:auto;flex:1}
-#settingsModal .modal-header{background:linear-gradient(135deg,#667eea,#764ba2)}
-.settings-section{margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #202225}
-.settings-section:last-child{border-bottom:none}
+.section{margin-bottom:16px}
 .section-title{font-size:13px;font-weight:600;color:#fff;margin-bottom:8px}
-.settings-subtitle{font-size:12px;color:#96989d;margin-bottom:12px}
-.username-group{margin-bottom:8px}
-.username-input{width:100%;padding:10px;background:#40444b;border:1px solid #202225;border-radius:4px;color:#fff;font-size:13px;margin-bottom:8px}
-.username-input:focus{outline:none;border-color:#5865f2}
-.role-card{background:#40444b;padding:12px;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
-.role-info{flex:1}
-.role-title{font-weight:600;font-size:14px;margin-bottom:4px}
-.role-title.owner{color:#e74c3c}
-.role-title.admin{color:#faa61a}
-.role-title.vip{color:#f47fff}
-.role-desc{font-size:11px;color:#96989d}
-.role-status{font-size:11px;font-weight:600;padding:4px 8px;border-radius:4px}
-.role-status.active{background:#3ba55d;color:#fff}
-.role-status.inactive{background:#72767d;color:#dcddde}
-.auth-input-group{display:flex;gap:6px;margin-top:8px}
-.auth-input{flex:1;padding:8px;background:#2f3136;border:1px solid #202225;border-radius:4px;color:#fff;font-size:12px}
-.auth-input:focus{outline:none;border-color:#5865f2}
-.auth-btn{padding:8px 12px;background:#5865f2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;transition:background .2s}
-.auth-btn:hover{background:#4752c4}
 .leaderboard{background:#40444b;border-radius:6px;padding:8px}
 .lb-item{display:flex;align-items:center;padding:6px 8px;background:#2f3136;border-radius:4px;margin-bottom:4px;transition:background .15s}
 .lb-item:hover{background:#36393f}
@@ -189,137 +179,206 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 .game-result{font-size:18px;font-weight:700;margin-top:16px}
 .game-result.win{color:#3ba55d}
 .game-result.lose{color:#ed4245}
-#adminPanel{position:fixed;bottom:60px;left:8px;width:440px;max-height:400px;background:#2f3136;border:1px solid #202225;border-radius:8px;display:none;flex-direction:column;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.5);overflow:hidden}
+
+/* 🔥 IMPROVED ADMIN PANEL - FIXED SIZE ISSUES */
+#adminPanel{
+position:fixed;
+bottom:60px;
+left:8px;
+width:440px;
+max-height:400px; /* 🎯 FIXED: Reduced from 550px to 400px */
+background:#2f3136;
+border:1px solid #202225;
+border-radius:8px;
+display:none;
+flex-direction:column;
+z-index:999;
+box-shadow:0 8px 24px rgba(0,0,0,.5);
+overflow:hidden;
+}
 #adminPanel.show{display:flex}
-.ap-header{padding:10px 16px;border-bottom:1px solid #202225;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.ap-header{
+padding:10px 16px;
+border-bottom:1px solid #202225;
+display:flex;
+justify-content:space-between;
+align-items:center;
+flex-shrink:0;
+}
 .ap-title{color:#fff;font-weight:600;font-size:14px}
 .ap-close{background:none;border:none;color:#96989d;cursor:pointer;font-size:20px;transition:color .2s}
 .ap-close:hover{color:#fff}
-.ap-tabs{display:flex;padding:6px 8px;gap:4px;border-bottom:1px solid #202225;flex-wrap:wrap;flex-shrink:0}
-.ap-tab{padding:6px 10px;background:none;border:none;color:#96989d;cursor:pointer;border-radius:4px;font-size:11px;font-weight:500;transition:all .15s}
+.ap-tabs{
+display:flex;
+padding:6px 8px;
+gap:4px;
+border-bottom:1px solid #202225;
+flex-wrap:wrap;
+flex-shrink:0;
+}
+.ap-tab{
+padding:6px 10px;
+background:none;
+border:none;
+color:#96989d;
+cursor:pointer;
+border-radius:4px;
+font-size:11px;
+font-weight:500;
+transition:all .15s;
+}
 .ap-tab:hover{background:#3a3c42;color:#dcddde}
 .ap-tab.active{background:#5865f2;color:#fff}
-.ap-content{flex:1;overflow-y:auto;padding:10px;min-height:0}
+.ap-content{
+flex:1;
+overflow-y:auto; /* 🎯 CRITICAL: Proper scrolling */
+padding:10px;
+min-height:0; /* 🎯 CRITICAL: Allows flex child to shrink */
+}
 .ap-section{display:none}
 .ap-section.active{display:block}
-.ap-user{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#40444b;border-radius:6px;margin-bottom:4px;transition:background .15s}
+.ap-user{
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:6px 8px;
+background:#40444b;
+border-radius:6px;
+margin-bottom:4px;
+transition:background .15s;
+}
 .ap-user:hover{background:#474b52}
 .ap-user-info{display:flex;align-items:center;gap:8px;min-width:0}
-.ap-user-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;flex-shrink:0}
-.ap-user-name{color:#fff;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ap-user-avatar{
+width:28px;
+height:28px;
+border-radius:50%;
+background:linear-gradient(135deg,#667eea,#764ba2);
+display:flex;
+align-items:center;
+justify-content:center;
+color:#fff;
+font-size:12px;
+font-weight:600;
+flex-shrink:0;
+}
+.ap-user-name{
+color:#fff;
+font-size:12px;
+overflow:hidden;
+text-overflow:ellipsis;
+white-space:nowrap;
+}
 .ap-user-actions{display:flex;gap:3px;flex-shrink:0}
-.ap-btn{padding:4px 8px;border:none;border-radius:3px;cursor:pointer;font-size:10px;font-weight:600;color:#fff;transition:opacity .2s}
+.ap-btn{
+padding:4px 8px;
+border:none;
+border-radius:3px;
+cursor:pointer;
+font-size:10px;
+font-weight:600;
+color:#fff;
+transition:opacity .2s;
+}
 .ap-btn:hover{opacity:.8}
 .ap-btn-kick{background:#faa61a}
 .ap-btn-to{background:#f47b67}
 .ap-btn-mute{background:#9b59b6}
 .ap-btn-ban{background:#ed4245}
-.troll-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:10px}
-.troll-btn{padding:7px 4px;border:none;border-radius:4px;cursor:pointer;font-size:10px;font-weight:600;color:#fff;background:#5865f2;transition:all .2s}
+.troll-grid{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:5px;
+margin-bottom:10px;
+}
+.troll-btn{
+padding:7px 4px;
+border:none;
+border-radius:4px;
+cursor:pointer;
+font-size:10px;
+font-weight:600;
+color:#fff;
+background:#5865f2;
+transition:all .2s;
+}
 .troll-btn:hover{opacity:.9;transform:scale(1.02)}
 .troll-btn.warn{background:#faa61a}
 .troll-btn.danger{background:#ed4245}
 .troll-btn.success{background:#3ba55d}
-.owner-section{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #202225}
+
+/* 🎯 OWNER SECTION - IMPROVED LAYOUT */
+.owner-section{
+margin-bottom:12px;
+padding-bottom:12px;
+border-bottom:1px solid #202225;
+}
 .owner-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
-.owner-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
-.owner-btn{padding:7px;background:#e74c3c;color:#fff;border:none;border-radius:4px;font-weight:600;cursor:pointer;font-size:10px;transition:all .2s}
+.owner-grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:5px;
+}
+.owner-btn{
+padding:7px;
+background:#e74c3c;
+color:#fff;
+border:none;
+border-radius:4px;
+font-weight:600;
+cursor:pointer;
+font-size:10px;
+transition:all .2s;
+}
 .owner-btn:hover{background:#c0392b;transform:scale(1.02)}
-.ban-list{max-height:100px;overflow-y:auto;background:#40444b;border-radius:4px;padding:6px;margin-bottom:8px}
-.ban-item{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;background:#2f3136;border-radius:3px;margin-bottom:3px;font-size:11px;color:#dcddde}
-.unban-btn{background:#3ba55d;color:#fff;border:none;padding:3px 6px;border-radius:3px;font-size:9px;cursor:pointer;transition:background .2s}
+.ban-list{
+max-height:100px; /* 🎯 FIXED: Reduced from 120px */
+overflow-y:auto;
+background:#40444b;
+border-radius:4px;
+padding:6px;
+margin-bottom:8px;
+}
+.ban-item{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:4px 6px;
+background:#2f3136;
+border-radius:3px;
+margin-bottom:3px;
+font-size:11px;
+color:#dcddde;
+}
+.unban-btn{
+background:#3ba55d;
+color:#fff;
+border:none;
+padding:3px 6px;
+border-radius:3px;
+font-size:9px;
+cursor:pointer;
+transition:background .2s;
+}
 .unban-btn:hover{background:#2d8659}
-.badge{font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;color:#fff}
-.badge-owner{background:linear-gradient(135deg,#e74c3c,#c0392b)}
-.badge-admin{background:linear-gradient(135deg,#faa61a,#ff8c00)}
-.badge-vip{background:linear-gradient(135deg,#f47fff,#ff6ec7)}
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-10px)}75%{transform:translateX(10px)}}
 @keyframes rainbow{0%{filter:hue-rotate(0)}100%{filter:hue-rotate(360deg)}}
 .confetti{position:fixed;width:10px;height:10px;pointer-events:none;z-index:9999;animation:fall 3s linear forwards}
 @keyframes fall{to{transform:translateY(100vh) rotate(720deg);opacity:0}}
-::-webkit-scrollbar{width:8px}
-::-webkit-scrollbar-track{background:#2f3136}
-::-webkit-scrollbar-thumb{background:#202225;border-radius:4px}
-::-webkit-scrollbar-thumb:hover{background:#1a1c1f}
-#usernamePrompt{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center}
-#usernamePrompt.hide{display:none}
-.username-prompt-card{width:400px;background:#2f3136;border:1px solid #202225;border-radius:12px;padding:32px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)}
-.username-prompt-title{font-size:24px;font-weight:700;color:#fff;margin-bottom:8px}
-.username-prompt-subtitle{font-size:14px;color:#96989d;margin-bottom:24px}
-.username-prompt-input{width:100%;padding:14px;background:#40444b;border:1px solid #202225;border-radius:6px;color:#fff;font-size:15px;margin-bottom:16px;text-align:center}
-.username-prompt-input:focus{outline:none;border-color:#5865f2;box-shadow:0 0 0 2px rgba(88,101,242,.2)}
-.username-prompt-btn{width:100%;padding:14px;background:#5865f2;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:15px;cursor:pointer;transition:background .2s}
-.username-prompt-btn:hover{background:#4752c4}
 </style>
 </head>
 <body>
-  <div id="usernamePrompt">
-  <div class="username-prompt-card">
-    <div class="username-prompt-title">Welcome to The Chet</div>
-    <div class="username-prompt-subtitle">Choose your username to get started</div>
-    <input type="text" class="username-prompt-input" id="promptUsernameInput" placeholder="Enter your username..." maxlength="30">
-    <button class="username-prompt-btn" id="promptSubmit">Continue</button>
-  </div>
+<div id="loginOverlay">
+<div class="login-title">The Chet</div>
+<div id="loginCard">
+<h2>Enter Password</h2>
+<input type="password" id="pwdInput" placeholder="Password">
+<button id="loginBtn">Login</button>
+<div id="loginError"></div>
+</div>
 </div>
 <div class="notifs" id="notifs"></div>
-
-<div class="modal-overlay" id="settingsModal">
-<div class="modal">
-<div class="modal-header">
-<div class="modal-title">⚙️ Settings</div>
-<button class="modal-close" id="closeSettings">×</button>
-</div>
-<div class="modal-body">
-<div class="settings-section">
-<div class="section-title">Username</div>
-<div class="settings-subtitle">Change your display name</div>
-<div class="username-group">
-<input type="text" class="username-input" id="usernameInput" placeholder="Enter username" maxlength="30">
-<button class="btn btn-primary" id="updateUsername">Update Username</button>
-</div>
-</div>
-<div class="settings-section">
-<div class="section-title">Role Authentication</div>
-<div class="settings-subtitle">Sign in to unlock special privileges</div>
-<div class="role-card">
-<div class="role-info">
-<div class="role-title owner">👑 Owner</div>
-<div class="role-desc">Full server control + coin management</div>
-<div class="auth-input-group" id="ownerAuth">
-<input type="password" class="auth-input" id="ownerPwd" placeholder="Owner password">
-<button class="auth-btn" id="ownerLogin">Sign In</button>
-</div>
-</div>
-<div class="role-status inactive" id="ownerStatus">Inactive</div>
-</div>
-<div class="role-card">
-<div class="role-info">
-<div class="role-title admin">⚡ Admin</div>
-<div class="role-desc">Moderation tools + admin panel</div>
-<div class="auth-input-group" id="adminAuth">
-<input type="password" class="auth-input" id="adminPwd" placeholder="Admin password">
-<button class="auth-btn" id="adminLogin">Sign In</button>
-</div>
-</div>
-<div class="role-status inactive" id="adminStatus">Inactive</div>
-</div>
-<div class="role-card">
-<div class="role-info">
-<div class="role-title vip">⭐ VIP</div>
-<div class="role-desc">Special badge + perks</div>
-<div class="auth-input-group" id="vipAuth">
-<input type="password" class="auth-input" id="vipPwd" placeholder="VIP password">
-<button class="auth-btn" id="vipLogin">Sign In</button>
-</div>
-</div>
-<div class="role-status inactive" id="vipStatus">Inactive</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-
 <div class="modal-overlay" id="casinoModal">
 <div class="modal">
 <div class="modal-header">
@@ -351,7 +410,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 </div>
 </div>
 </div>
-
 <div id="gameScreen">
 <div class="game-modal">
 <div class="game-vs" id="gameVs"></div>
@@ -361,7 +419,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 <div class="game-result" id="gameResult"></div>
 </div>
 </div>
-
 <div id="adminPanel">
 <div class="ap-header">
 <div class="ap-title">⚡ Admin Panel</div>
@@ -449,13 +506,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 </div>
 </div>
 </div>
-
 <div class="container">
 <div class="sidebar">
-<div class="server-header">
-<span>The Chet</span>
-<button class="settings-btn" id="openSettings">⚙️</button>
-</div>
+<div class="server-header">The Chet</div>
 <div class="channels">
 <div class="channel-section">
 <div class="section-header">Channels</div>
@@ -468,6 +521,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 <div class="section-header">Direct Messages</div>
 <div id="dmList"></div>
 </div>
+</div>
+<div class="users-section">
+<div class="users-section-header">ONLINE USERS</div>
+<div class="role-header owner-header">Owners</div>
+<div id="ownersList"></div>
+<div class="role-header admin-header">Admins</div>
+<div id="adminsList"></div>
+<div class="role-header vip-header">VIP</div>
+<div id="vipsList"></div>
+<div class="role-header online-header">Users</div>
+<div id="regularList"></div>
 </div>
 <div class="user-area" id="userArea">
 <div class="user-avatar" id="myAvatar">U
@@ -497,12 +561,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 </div>
 </div>
 </div>
-<div class="right-sidebar">
-<div class="right-sidebar-header">Members — <span id="memberCount">0</span></div>
-<div class="members-list" id="membersList"></div>
 </div>
-</div>
-
 <script>
 const EMOJIS=['👍','👎','❤️','😂','😮','😢','🔥','🎉','👀','💯'];
 let ws,connected=false,username='',uuid=null,isAdmin=false,isVIP=false,isOwner=false,coins=0,peace=false;
@@ -605,43 +664,15 @@ function handle(d){
 function updCoins(){$('coinsCnt').textContent=coins;$('coinsBox').classList.toggle('peace',peace)}
 function updLB(lb){$('leaderboard').innerHTML=lb.length?lb.map((u,i)=>`<div class="lb-item"><span class="lb-rank">#${i+1}</span><span class="lb-name">${u.username}</span><span class="lb-coins">${u.coins}💰</span></div>`).join(''):'<div class="empty">No data</div>'}
 function updUsers(){
-  const ow=users.filter(u=>u.isOwner);
-  const ad=users.filter(u=>u.isAdmin&&!u.isOwner);
-  const vi=users.filter(u=>u.isVIP&&!u.isAdmin&&!u.isOwner);
-  const re=users.filter(u=>!u.isVIP&&!u.isAdmin&&!u.isOwner);
-  
-  let html='';
-  if(ow.length){
-    html+=`<div class="member-role-section"><div class="member-role-header owner">OWNERS — ${ow.length}</div>`;
-    ow.forEach(u=>{
-      html+=`<div class="member-item" onclick="reqDM('${u.username}')"><div class="member-avatar">${u.username[0].toUpperCase()}<div class="member-status"></div></div><div class="member-info"><div class="member-username owner">${u.username}</div></div></div>`;
-    });
-    html+=`</div>`;
-  }
-  if(ad.length){
-    html+=`<div class="member-role-section"><div class="member-role-header admin">ADMINS — ${ad.length}</div>`;
-    ad.forEach(u=>{
-      html+=`<div class="member-item" onclick="reqDM('${u.username}')"><div class="member-avatar">${u.username[0].toUpperCase()}<div class="member-status"></div></div><div class="member-info"><div class="member-username admin">${u.username}</div></div></div>`;
-    });
-    html+=`</div>`;
-  }
-  if(vi.length){
-    html+=`<div class="member-role-section"><div class="member-role-header vip">VIP — ${vi.length}</div>`;
-    vi.forEach(u=>{
-      html+=`<div class="member-item" onclick="reqDM('${u.username}')"><div class="member-avatar">${u.username[0].toUpperCase()}<div class="member-status"></div></div><div class="member-info"><div class="member-username vip">${u.username}</div></div></div>`;
-    });
-    html+=`</div>`;
-  }
-  if(re.length){
-    html+=`<div class="member-role-section"><div class="member-role-header online">MEMBERS — ${re.length}</div>`;
-    re.forEach(u=>{
-      html+=`<div class="member-item" onclick="reqDM('${u.username}')"><div class="member-avatar">${u.username[0].toUpperCase()}<div class="member-status"></div></div><div class="member-info"><div class="member-username">${u.username}</div></div></div>`;
-    });
-    html+=`</div>`;
-  }
-  
-  $('membersList').innerHTML=html||'<div class="empty">No members online</div>';
-  $('memberCount').textContent=users.length;
+  const ow=users.filter(u=>u.isOwner&&u.username!==username);
+  const ad=users.filter(u=>u.isAdmin&&!u.isOwner&&u.username!==username);
+  const vi=users.filter(u=>u.isVIP&&!u.isAdmin&&!u.isOwner&&u.username!==username);
+  const re=users.filter(u=>!u.isVIP&&!u.isAdmin&&!u.isOwner&&u.username!==username);
+  const makeItem=(u,badge)=>`<div class="user-item"><span class="user-name">${u.username}${badge?` <span class="badge ${badge}">${badge.toUpperCase()}</span>`:''}</span><button class="dm-btn" onclick="reqDM('${u.username}')">DM</button></div>`;
+  $('ownersList').innerHTML=ow.map(u=>makeItem(u,'badge-owner')).join('')||'<div class="empty">None</div>';
+  $('adminsList').innerHTML=ad.map(u=>makeItem(u,'badge-admin')).join('')||'<div class="empty">None</div>';
+  $('vipsList').innerHTML=vi.map(u=>makeItem(u,'badge-vip')).join('')||'<div class="empty">None</div>';
+  $('regularList').innerHTML=re.map(u=>makeItem(u,'')).join('')||'<div class="empty">None</div>';
   updSelects();
 }
 function updSelects(){
@@ -710,171 +741,39 @@ function placeBet(gid){
 function acceptGame(gid,choice){document.getElementById('gc-'+gid)?.remove();send({type:'challengeResponse',gameId:gid,accepted:true,choice})}
 function declineGame(gid,el){el.closest('.notif')?.remove();send({type:'challengeResponse',gameId:gid,accepted:false})}
 
+// Event Listeners
 document.addEventListener('DOMContentLoaded',()=>{
-  // Check if user has existing username
-  let savedUsername = localStorage.getItem('username');
-  
-  if(savedUsername) {
-    // User has username, auto-login
-    username = savedUsername.slice(0,30).trim();
+  // Login
+  $('loginBtn').onclick=tryLogin;
+  $('pwdInput').onkeypress=e=>{if(e.key==='Enter')tryLogin()};
+  function tryLogin(){
+    const p=$('pwdInput').value.trim();
+    if(p==='6shravan'){isAdmin=true;isOwner=true}
+    else if(p==='classic-admin-76'){isAdmin=true}
+    else if(p==='very-important-person'){isVIP=true}
+    else if(p!=='classic'){$('loginError').textContent='Wrong password';return}
+    let u=prompt('Enter username (max 30 chars):','User')||'User';
+    username=u.slice(0,30).trim()||'User';
     $('myName').textContent=username;
     $('myAvatar').childNodes[0].textContent=username[0].toUpperCase();
-    $('usernameInput').value=username;
-    $('usernamePrompt').classList.add('hide');
+    if(isOwner)$('badgeOwner').classList.add('show');
+    else if(isAdmin)$('badgeAdmin').classList.add('show');
+    else if(isVIP)$('badgeVip').classList.add('show');
+    if(isOwner)$('ownerTab').style.display='block';
     uuid=localStorage.getItem('uuid')||null;
+    $('loginOverlay').style.display='none';
     connect();
-  } else {
-    // New user, show prompt
-    $('promptUsernameInput').focus();
   }
-  
-  // Username prompt submit
-  $('promptSubmit').onclick=()=>{
-    const newName = $('promptUsernameInput').value.trim().slice(0,30);
-    if(!newName || newName.length < 2) {
-      $('promptUsernameInput').style.borderColor='#ed4245';
-      return;
-    }
-    username = newName;
-    localStorage.setItem('username',username);
-    $('myName').textContent=username;
-    $('myAvatar').childNodes[0].textContent=username[0].toUpperCase();
-    $('usernameInput').value=username;
-    $('usernamePrompt').classList.add('hide');
-    uuid=localStorage.getItem('uuid')||null;
-    connect();
-  };
-  
-  $('promptUsernameInput').onkeypress=e=>{
-    if(e.key==='Enter') $('promptSubmit').click();
-    $('promptUsernameInput').style.borderColor='#202225';
-  };
-  
-  $('openSettings').onclick=()=>$('settingsModal').classList.add('show');
-  $('closeSettings').onclick=()=>$('settingsModal').classList.remove('show');
-  
-  $('updateUsername').onclick=()=>{
-    const newName = $('usernameInput').value.trim().slice(0,30);
-    if(!newName)return notify('❌','Enter a username');
-    const oldName = username;
-    username=newName;
-    localStorage.setItem('username',username);
-    $('myName').textContent=username;
-    $('myAvatar').childNodes[0].textContent=username[0].toUpperCase();
-    
-    // Clear old user from local list before reconnecting
-    users.length = 0;
-    
-    if(ws)ws.close();
-    setTimeout(connect,100);
-    notify('✅','Username updated! Reconnecting...');
-  };
-  
-  $('ownerLogin').onclick=()=>{
-    const pwd=$('ownerPwd').value;
-    if(pwd==='6shravan'){
-      isOwner=true;isAdmin=true;
-      $('badgeOwner').classList.add('show');
-      $('ownerStatus').textContent='Active';
-      $('ownerStatus').classList.remove('inactive');
-      $('ownerStatus').classList.add('active');
-      $('ownerAuth').style.display='none';
-      $('ownerTab').style.display='block';
-      
-      // Clear users list to prevent duplicates
-      users.length = 0;
-      
-      if(ws)ws.close();
-      setTimeout(connect,100);
-      notify('✅','Signed in as Owner');
-    }else{
-      notify('❌','Wrong password');
-    }
-  };
-  
-  $('adminLogin').onclick=()=>{
-    const pwd=$('adminPwd').value;
-    if(pwd==='classic-admin-76'||isOwner){
-      isAdmin=true;
-      $('badgeAdmin').classList.add('show');
-      $('adminStatus').textContent='Active';
-      $('adminStatus').classList.remove('inactive');
-      $('adminStatus').classList.add('active');
-      $('adminAuth').style.display='none';
-      
-      // Clear users list to prevent duplicates
-      users.length = 0;
-      
-      if(ws)ws.close();
-      setTimeout(connect,100);
-      notify('✅','Signed in as Admin');
-    }else{
-      notify('❌','Wrong password');
-    }
-  };
-  
-  $('vipLogin').onclick=()=>{
-    const pwd=$('vipPwd').value;
-    if(pwd==='very-important-person'){
-      isVIP=true;
-      $('badgeVip').classList.add('show');
-      $('vipStatus').textContent='Active';
-      $('vipStatus').classList.remove('inactive');
-      $('vipStatus').classList.add('active');
-      $('vipAuth').style.display='none';
-      
-      // Clear users list to prevent duplicates
-      users.length = 0;
-      
-      if(ws)ws.close();
-      setTimeout(connect,100);
-      notify('✅','Signed in as VIP');
-    }else{
-      notify('❌','Wrong password');
-    }
-  };
-  
-  $('adminLogin').onclick=()=>{
-    const pwd=$('adminPwd').value;
-    if(pwd==='classic-admin-76'||isOwner){
-      isAdmin=true;
-      $('badgeAdmin').classList.add('show');
-      $('adminStatus').textContent='Active';
-      $('adminStatus').classList.remove('inactive');
-      $('adminStatus').classList.add('active');
-      $('adminAuth').style.display='none';
-      if(ws)ws.close();
-      setTimeout(connect,100);
-      notify('✅','Signed in as Admin');
-    }else{
-      notify('❌','Wrong password');
-    }
-  };
-  
-  $('vipLogin').onclick=()=>{
-    const pwd=$('vipPwd').value;
-    if(pwd==='very-important-person'){
-      isVIP=true;
-      $('badgeVip').classList.add('show');
-      $('vipStatus').textContent='Active';
-      $('vipStatus').classList.remove('inactive');
-      $('vipStatus').classList.add('active');
-      $('vipAuth').style.display='none';
-      if(ws)ws.close();
-      setTimeout(connect,100);
-      notify('✅','Signed in as VIP');
-    }else{
-      notify('❌','Wrong password');
-    }
-  };
-  
+  // Send message
   $('sendBtn').onclick=sendMsg;
   $('msgInput').onkeypress=e=>{if(e.key==='Enter')sendMsg()};
   $('cancelReply').onclick=clearReply;
+  // Channels
   document.querySelectorAll('.channel[data-channel]').forEach(c=>{c.onclick=()=>switchChan(c.dataset.channel)});
+  // Casino
   $('openCasino').onclick=()=>{$('casinoModal').classList.add('show');send({type:'getLeaderboard'});updSelects()};
   $('closeCasino').onclick=()=>{$('casinoModal').classList.remove('show');selGame=null;selChoice=null;document.querySelectorAll('.game-card').forEach(c=>c.classList.remove('selected'));$('choiceArea').style.display='none'};
-  
+  // Game selection
   document.querySelectorAll('.game-card').forEach(c=>{
     c.onclick=()=>{
       document.querySelectorAll('.game-card').forEach(x=>x.classList.remove('selected'));
@@ -886,7 +785,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       document.querySelectorAll('.choice-btn').forEach(b=>{b.onclick=()=>{document.querySelectorAll('.choice-btn').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');selChoice=b.dataset.choice}});
     }
   });
-  
+  // Send challenge
   $('sendChallengeBtn').onclick=()=>{
     const target=$('challengeTarget').value;
     const wager=parseInt($('wagerAmt').value);
@@ -898,11 +797,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     send({type:'challengeUser',targetUsername:target,game:selGame,wager,choice:selChoice});
     $('casinoModal').classList.remove('show');
   };
-  
+  // Game ready
   $('readyBtn').onclick=()=>{send({type:'playerChoice',gameId:curGameId});$('readyBtn').style.display='none';$('gameAnim').style.animation='spin 1s linear infinite'};
+  // Admin panel
   $('userArea').onclick=()=>{if(isAdmin||isOwner){$('adminPanel').classList.toggle('show');updSelects();send({type:'adminGetBanList'})}};
   $('closeAdmin').onclick=()=>$('adminPanel').classList.remove('show');
-  
+  // Admin tabs
   document.querySelectorAll('.ap-tab').forEach(tab=>{
     tab.onclick=()=>{
       document.querySelectorAll('.ap-tab').forEach(t=>t.classList.remove('active'));
@@ -912,7 +812,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       if(sec)sec.classList.add('active');
     }
   });
-  
+  // Mod actions
   $('execMod').onclick=()=>{
     const u=$('modUser').value,a=$('modAction').value,d=parseInt($('modDur').value)||60,r=$('modReason').value;
     if(!u)return notify('❌','Select user');
@@ -922,7 +822,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     else if(a==='ban')send({type:'adminBan',targetUsername:u,banType:'username',reason:r});
     else if(a==='warning')send({type:'adminWarning',targetUsername:u,reason:r||'Warning'});
   };
-  
+  // Troll actions
   document.querySelectorAll('[data-troll]').forEach(b=>{
     b.onclick=()=>{
       const u=$('trollUser').value;if(!u)return notify('❌','Select user');
@@ -935,7 +835,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('refreshBans').onclick=()=>send({type:'adminGetBanList'});
   $('applySlowMode').onclick=()=>send({type:'adminSlowMode',enabled:$('slowEnabled').checked,duration:parseInt($('slowDur').value)||5});
   $('clearChatBtn').onclick=()=>{if(confirm('Clear chat?'))send({type:'adminClearChat',channel:$('clearChan').value})};
-  
+  // Owner actions
   $('ownerGive').onclick=()=>{const u=$('ownerUser').value,a=parseInt($('ownerAmt').value);if(u&&a)send({type:'ownerGiveCoins',targetUsername:u,amount:a})};
   $('ownerTake').onclick=()=>{const u=$('ownerUser').value,a=parseInt($('ownerAmt').value);if(u&&a)send({type:'ownerTakeCoins',targetUsername:u,amount:a})};
   $('ownerSet').onclick=()=>{const u=$('ownerUser').value,a=parseInt($('ownerAmt').value);if(u&&a!==undefined)send({type:'ownerSetCoins',targetUsername:u,amount:a})};
@@ -944,10 +844,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('ownerMult').onclick=()=>{const m=parseFloat($('multAmt').value);if(m&&m>0&&confirm('Multiply all by '+m+'?'))send({type:'ownerMultiplyCoins',multiplier:m})};
   $('ownerGlobalReset').onclick=()=>{if(confirm('RESET ALL DATA?'))send({type:'ownerGlobalReset'})};
   $('ownerAnnounceBtn').onclick=()=>{const t=$('ownerAnnounce').value;if(t){send({type:'ownerAnnouncement',text:t});$('ownerAnnounce').value=''}};
-  
+  // Close emoji picker on outside click
   document.onclick=e=>{if(!e.target.closest('.emoji-picker')&&!e.target.closest('.msg-action'))document.querySelectorAll('.emoji-picker').forEach(p=>p.classList.remove('show'))};
+  // Close modals on overlay click
   $('casinoModal').onclick=e=>{if(e.target===$('casinoModal'))$('casinoModal').classList.remove('show')};
-  $('settingsModal').onclick=e=>{if(e.target===$('settingsModal'))$('settingsModal').classList.remove('show')};
 });
 </script>
 </body>
