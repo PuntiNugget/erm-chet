@@ -550,10 +550,18 @@ function connect(){
   ws=new WebSocket(url);
   ws.onopen=()=>{
     connected=true;$('connStatus').classList.add('online');$('sendBtn').disabled=false;
-    send({type:'join',username,uuid,adminPassword:isAdmin?'classic-admin-76':undefined,vipPassword:isVIP?'very-important-person':undefined,ownerPassword:isOwner?'6shravan':undefined});
+    send({type:'join',username,uuid,adminPassword:isAdmin||isOwner?'classic-admin-76':undefined,vipPassword:isVIP?'very-important-person':undefined,ownerPassword:isOwner?'6shravan':undefined});
     send({type:'getHistory',channel:curChan});
   };
-  ws.onclose=()=>{connected=false;$('connStatus').classList.remove('online');$('sendBtn').disabled=true;setTimeout(connect,3000)};
+  ws.onclose=()=>{
+    connected=false;
+    $('connStatus').classList.remove('online');
+    $('sendBtn').disabled=true;
+    // Only auto-reconnect if not intentionally disconnected
+    if(!ws.intentionalClose){
+      setTimeout(connect,3000);
+    }
+  };
   ws.onmessage=e=>{try{handle(JSON.parse(e.data))}catch(er){console.error(er)}};
 }
 
