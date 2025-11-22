@@ -705,17 +705,23 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('openSettings').onclick=()=>$('settingsModal').classList.add('show');
   $('closeSettings').onclick=()=>$('settingsModal').classList.remove('show');
   
-  $('updateUsername').onclick=()=>{
-    const newName = $('usernameInput').value.trim().slice(0,30);
-    if(!newName)return notify('❌','Enter a username');
-    username=newName;
-    localStorage.setItem('username',username);
-    $('myName').textContent=username;
-    $('myAvatar').childNodes[0].textContent=username[0].toUpperCase();
-    if(ws)ws.close();
-    setTimeout(connect,100);
-    notify('✅','Username updated! Reconnecting...');
-  };
+$('updateUsername').onclick=()=>{
+  const newName = $('usernameInput').value.trim().slice(0,30);
+  if(!newName)return notify('❌','Enter a username');
+  const oldName = username;
+  username=newName;
+  localStorage.setItem('username',username);
+  $('myName').textContent=username;
+  $('myAvatar').childNodes[0].textContent=username[0].toUpperCase();
+  
+  // Clear old user from local list before reconnecting
+  users = users.filter(u => u.username !== oldName);
+  updUsers();
+  
+  if(ws)ws.close();
+  setTimeout(connect,100);
+  notify('✅','Username updated! Reconnecting...');
+};
   
   $('ownerLogin').onclick=()=>{
     const pwd=$('ownerPwd').value;
