@@ -104,6 +104,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 ::-webkit-scrollbar-thumb{background:#202225;border-radius:4px}
 ::-webkit-scrollbar-thumb:hover{background:#1a1c1f}
 .empty{text-align:center;color:#72767d;padding:12px;font-size:12px}
+
+/* USERNAME PROMPT */
+#usernamePrompt{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#usernamePrompt.hidden{display:none}
+.username-card{background:#2f3136;border-radius:12px;padding:32px;width:400px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+.username-title{font-size:28px;color:#fff;font-weight:700;margin-bottom:8px}
+.username-subtitle{color:#96989d;font-size:14px;margin-bottom:24px}
+.username-input{width:100%;padding:14px;background:#40444b;border:2px solid #202225;border-radius:8px;color:#fff;font-size:16px;text-align:center;transition:border-color .2s;margin-bottom:8px}
+.username-input:focus{border-color:#5865f2;outline:none}
+.username-counter{color:#72767d;font-size:12px;margin-bottom:16px}
+.username-btn{width:100%;padding:14px;background:#5865f2;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:16px;cursor:pointer;transition:all .2s}
+.username-btn:hover{background:#4752c4;transform:translateY(-1px)}
+.username-btn:disabled{background:#4e5058;cursor:not-allowed;transform:none}
 .modal-overlay{position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center}
 .modal-overlay.show{display:flex}
 .modal{width:520px;max-height:80vh;background:#2f3136;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.5)}
@@ -254,6 +267,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 </style>
 </head>
 <body>
+<div id="usernamePrompt">
+<div class="username-card">
+<div class="username-title">Welcome to The Chet</div>
+<div class="username-subtitle">Choose your username to get started</div>
+<input type="text" class="username-input" id="usernamePromptInput" placeholder="Enter username..." maxlength="30" autocomplete="off">
+<div class="username-counter"><span id="charCount">0</span>/30</div>
+<button class="username-btn" id="usernameSubmit">Continue</button>
+</div>
+</div>
 <div class="notifs" id="notifs"></div>
 <div class="modal-overlay" id="casinoModal">
 <div class="modal">
@@ -298,11 +320,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 </div>
 <div class="modal-body">
 <div class="settings-section active" data-section="account">
-<div class="section-title">Username</div>
+<div class="section-title">Account Information</div>
 <div class="form-group">
-<input type="text" class="form-input" id="usernameInput" placeholder="Enter username" maxlength="30">
-<button class="btn btn-primary" id="changeUsername">Change Username</button>
+<label class="form-label">Username</label>
+<div style="padding:10px;background:#40444b;border-radius:4px;color:#dcddde;font-size:14px" id="displayUsername">User</div>
 </div>
+<div style="color:#96989d;font-size:12px;margin-top:8px">💡 Reconnect to change your username</div>
 </div>
 <div class="settings-section" data-section="roles">
 <div class="section-title">Sign in to Roles</div>
@@ -505,16 +528,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 </div>
 <script>
 const EMOJIS=['👍','👎','❤️','😂','😮','😢','🔥','🎉','👀','💯'];
-let ws,connected=false,username='User'+Math.floor(Math.random()*1000),uuid=null,isAdmin=false,isVIP=false,isOwner=false,coins=0,peace=false;
+let ws,connected=false,username='',uuid=null,isAdmin=false,isVIP=false,isOwner=false,coins=0,peace=false;
 let curChan='general',chatType='channel',curDM=null,replyTo=null,selGame=null,selChoice=null,curGameId=null;
 const messages={},dmMessages={},dmPartners={},users=[];
 const $=id=>document.getElementById(id);
 
-// Initialize username and connect immediately
+// Wait for username before connecting
 uuid=localStorage.getItem('uuid')||null;
-$('myName').textContent=username;
-$('myAvatar').childNodes[0].textContent=username[0].toUpperCase();
-$('usernameInput').value=username;
 
 function send(d){if(ws&&ws.readyState===1)ws.send(JSON.stringify(d))}
 function notify(title,body,acts){
@@ -719,8 +739,37 @@ function declineGame(gid,el){el.closest('.notif')?.remove();send({type:'challeng
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded',()=>{
-  // Auto-connect on load
-  connect();
+  // Username prompt
+  const promptInput=$('usernamePromptInput');
+  const charCount=$('charCount');
+  const submitBtn=$('usernameSubmit');
+  
+  promptInput.oninput=()=>{
+    charCount.textContent=promptInput.value.length;
+    submitBtn.disabled=promptInput.value.trim().length===0;
+  };
+  
+  promptInput.onkeypress=e=>{
+    if(e.key==='Enter'&&promptInput.value.trim()){
+      submitUsername();
+    }
+  };
+  
+  submitBtn.onclick=submitUsername;
+  
+  function submitUsername(){
+    const name=promptInput.value.trim();
+    if(!name)return;
+    username=name.slice(0,30);
+    $('myName').textContent=username;
+    $('myAvatar').childNodes[0].textContent=username[0].toUpperCase();
+    $('displayUsername').textContent=username;
+    $('usernamePrompt').classList.add('hidden');
+    connect();
+  }
+  
+  // Focus input on load
+  promptInput.focus();
   
   // Send message
   $('sendBtn').onclick=sendMsg;
@@ -743,22 +792,6 @@ document.addEventListener('DOMContentLoaded',()=>{
       document.querySelector(`.settings-section[data-section="${tab.dataset.tab}"]`).classList.add('active');
     }
   });
-  
-  // Change username
-  $('changeUsername').onclick=()=>{
-    const newName=$('usernameInput').value.trim().slice(0,30);
-    if(newName&&newName!==username){
-      username=newName;
-      $('myName').textContent=username;
-      $('myAvatar').childNodes[0].textContent=username[0].toUpperCase();
-      if(connected){
-        ws.close();
-        setTimeout(connect,500);
-      }
-      notify('✅','Username changed! Reconnecting...');
-      $('settingsModal').classList.remove('show');
-    }
-  };
   
   // Role sign-ins
   $('ownerSignIn').onclick=()=>{
