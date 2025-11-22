@@ -804,8 +804,13 @@ document.addEventListener('DOMContentLoaded',()=>{
       $('ownerTab').style.display='block';
       updateRoleStatus('owner',true);
       updateRoleStatus('admin',true);
-      if(connected){ws.close();setTimeout(connect,500)}
-      notify('✅','Signed in as Owner!');
+      notify('✅','Signed in as Owner! Reconnecting...');
+      setTimeout(()=>{
+        if(connected){
+          ws.close();
+          setTimeout(connect,1000);
+        }
+      },500);
     }else{
       notify('❌','Wrong password');
     }
@@ -817,8 +822,13 @@ document.addEventListener('DOMContentLoaded',()=>{
       isAdmin=true;
       $('badgeAdmin').classList.add('show');
       updateRoleStatus('admin',true);
-      if(connected){ws.close();setTimeout(connect,500)}
-      notify('✅','Signed in as Admin!');
+      notify('✅','Signed in as Admin! Reconnecting...');
+      setTimeout(()=>{
+        if(connected){
+          ws.close();
+          setTimeout(connect,1000);
+        }
+      },500);
     }else{
       notify('❌','Wrong password');
     }
@@ -830,8 +840,13 @@ document.addEventListener('DOMContentLoaded',()=>{
       isVIP=true;
       $('badgeVip').classList.add('show');
       updateRoleStatus('vip',true);
-      if(connected){ws.close();setTimeout(connect,500)}
-      notify('✅','Signed in as VIP!');
+      notify('✅','Signed in as VIP! Reconnecting...');
+      setTimeout(()=>{
+        if(connected){
+          ws.close();
+          setTimeout(connect,1000);
+        }
+      },500);
     }else{
       notify('❌','Wrong password');
     }
