@@ -20,6 +20,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 .channel-name{display:flex;align-items:center}
 .channel-name::before{content:'#';margin-right:6px;font-weight:600;color:#72767d}
 .channel.private .channel-name::before{content:'@';color:#5865f2}
+.channel.voice .channel-name::before{content:'🔊';margin-right:4px}
 .close-dm{opacity:0;background:none;border:none;color:#96989d;cursor:pointer;font-size:16px;transition:opacity .2s}
 .channel:hover .close-dm{opacity:1}
 .close-dm:hover{color:#ed4245}
@@ -189,6 +190,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 .member-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dm-btn{opacity:0;background:#5865f2;color:#fff;border:none;padding:3px 8px;border-radius:3px;font-size:10px;cursor:pointer;transition:opacity .2s}
 .member-item:hover .dm-btn{opacity:1}
+.member-item:hover .dm-btn{opacity:1;display:block}
 
 /* SETTINGS MODAL */
 .settings-modal .modal{width:600px}
@@ -335,6 +337,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 </div>
 <div class="settings-section" data-section="roles">
 <div class="section-title">Sign in to Roles</div>
+<div style="color:#96989d;font-size:13px;margin-bottom:16px">💡 You can sign in when you first join the server</div>
+<!-- KEEPING FOR FUTURE USE
 <div class="role-card">
 <div class="role-card-header">
 <div class="role-icon owner">👑</div>
@@ -379,6 +383,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 </div>
 <input type="password" class="role-input" id="vipPassword" placeholder="VIP password">
 <button class="role-btn signin" id="vipSignIn">Sign In as VIP</button>
+</div>
+-->
+<div class="role-card">
+<div class="role-card-header">
+<div class="role-icon owner">👑</div>
+<div>
+<div class="role-title">Your Role</div>
+<div class="role-desc">Current role status</div>
+</div>
+</div>
+<div class="role-status" id="ownerStatus">
+<span>●</span>
+<span id="ownerStatusText">Not signed in</span>
+</div>
+<div class="role-status" id="adminStatus">
+<span>●</span>
+<span id="adminStatusText">Not signed in</span>
+</div>
+<div class="role-status" id="vipStatus">
+<span>●</span>
+<span id="vipStatusText">Not signed in</span>
+</div>
 </div>
 </div>
 </div>
@@ -494,6 +520,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 <div class="channel-section">
 <div class="section-header">Direct Messages</div>
 <div id="dmList"></div>
+</div>
+<div class="channel-section">
+<div class="section-header">Voice Channels</div>
+<div class="channel voice" data-voice="lobby"><span class="channel-name">Lobby</span></div>
+<div class="channel voice" data-voice="gaming"><span class="channel-name">Gaming</span></div>
+<div class="channel voice" data-voice="chill"><span class="channel-name">Chill Zone</span></div>
 </div>
 </div>
 <div class="user-area" id="userArea">
@@ -665,7 +697,12 @@ function updMembersList(){
   const vi=users.filter(u=>u.isVIP&&!u.isAdmin&&!u.isOwner);
   const re=users.filter(u=>!u.isVIP&&!u.isAdmin&&!u.isOwner);
   
-  const makeItem=(u)=>`<div class="member-item" onclick="reqDM('${u.username}')"><div class="member-avatar">${u.username[0].toUpperCase()}<div class="member-status"></div></div><div class="member-info"><div class="member-name">${u.username}</div></div></div>`;
+  const makeItem=(u)=>{
+    if(u.username===username){
+      return `<div class="member-item"><div class="member-avatar">${u.username[0].toUpperCase()}<div class="member-status"></div></div><div class="member-info"><div class="member-name">${u.username} (You)</div></div></div>`;
+    }
+    return `<div class="member-item"><div class="member-avatar">${u.username[0].toUpperCase()}<div class="member-status"></div></div><div class="member-info"><div class="member-name">${u.username}</div></div><button class="dm-btn" onclick="event.stopPropagation();reqDM('${u.username}')">DM</button></div>`;
+  };
   
   let html='';
   if(ow.length){html+=`<div class="role-section"><div class="role-header owner">OWNERS</div>${ow.map(makeItem).join('')}</div>`}
@@ -816,6 +853,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Channels
   document.querySelectorAll('.channel[data-channel]').forEach(c=>{c.onclick=()=>switchChan(c.dataset.channel)});
   
+  // Voice channels (placeholder - just show notification)
+  document.querySelectorAll('.channel[data-voice]').forEach(c=>{
+    c.onclick=()=>notify('🔊',`Voice channel "${c.dataset.voice}" - Coming soon!`);
+  });
+  
   // Settings modal
   $('openSettings').onclick=()=>$('settingsModal').classList.add('show');
   $('closeSettings').onclick=()=>$('settingsModal').classList.remove('show');
@@ -830,7 +872,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
   });
   
-  // Role sign-ins
+  // Role sign-ins (COMMENTED OUT FOR FUTURE USE)
+  /*
   $('ownerSignIn').onclick=()=>{
     const pwd=$('ownerPassword').value;
     if(pwd==='6shravan'){
@@ -873,6 +916,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       notify('❌','Wrong password');
     }
   };
+  */
   
   // Casino
   $('openCasino').onclick=()=>{$('casinoModal').classList.add('show');send({type:'getLeaderboard'});updSelects()};
