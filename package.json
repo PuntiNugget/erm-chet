@@ -1,7 +1,7 @@
 {
-  "name": "canvas",
-  "version": "1.0.0",
-  "description": "A simple Discord-like chat application with WebSocket support",
+  "name": "the-chet",
+  "version": "2.0.0",
+  "description": "Discord-like chat with WebRTC voice, casino, and admin tools",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -10,6 +10,8 @@
   "keywords": [
     "chat",
     "websocket",
+    "webrtc",
+    "voice-chat",
     "real-time"
   ],
   "author": "",
@@ -20,5 +22,8 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
