@@ -2,8 +2,10 @@ stats.gamesPlayed++;
       if (won) { stats.gamesWon++; stats.currentStreak++; stats.bestStreak = Math.max(stats.bestStreak, stats.currentStreak); stats.biggestWin = Math.max(stats.biggestWin, amount); }
       else stats.currentStreak = 0;
       saveData();
-      ws.send(JSON.stringify({ type: 'broadcast', message: `🪙 ${result.toUpperCase()}! ${won ? `Won ${amount}!` : `Lost ${amount}`}` }));
-    },
+//      ws.send(JSON.stringify({ type: 'broadcast', message: `🪙 ${result.toUpperCase()}! ${won ? `Won ${amount}!` : `Lost ${amount}`}` }));
+      ws.send(JSON.stringify({ type: 'broadcast', message: `🪙 ${result.toUpperCase()}! ${won} ? `Won ${amount}!` : `Lost ${amount}`}` }));
+
+   },
     '/dice': () => {
       const amount = parseInt(parts[1]);
       const choice = parts[2]?.toLowerCase();
