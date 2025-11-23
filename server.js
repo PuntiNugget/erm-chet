@@ -3,7 +3,7 @@ stats.gamesPlayed++;
       else stats.currentStreak = 0;
       saveData();
 //      ws.send(JSON.stringify({ type: 'broadcast', message: `🪙 ${result.toUpperCase()}! ${won ? `Won ${amount}!` : `Lost ${amount}`}` }));
-      ws.send(JSON.stringify({ type: 'broadcast', message: `🪙 ${result.toUpperCase()}! ${won} ? `Won ${amount}!` : `Lost ${amount}`}` }));
+      ws.send(JSON.stringify({ type: 'broadcast', message: "${result.toUpperCase()} " `${won} ? "Won ${amount}" : "Lost ${amount}"}` }));
 
    },
     '/dice': () => {
