@@ -1,429 +1,4 @@
-const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
-
-const channels = { announcements: [], general: [], gaming: [], memes: [] };
-const users = new Map();
-const privateChats = new Map();
-const userSocketMap = new Map();
-const bannedUsers = new Set();
-const timedOutUsers = new Map();
-const bannedIPs = new Set();
-const tempBannedIPs = new Map();
-const ipBanMap = new Map();
-const lastMessageTime = new Map();
-const spamTracker = new Map();
-const mutedUsers = new Map();
-const userWarnings = new Map();
-const userCoins = new Map();
-const activeGames = new Map();
-const gameBets = new Map();
-const persistentAnnouncements = [];
-const adminUsers = new Set();
-const vipUsers = new Set();
-const ownerUsers = new Set();
-const adminActions = [];
-const userStats = new Map();
-
-const ADMIN_PASSWORD = 'classic-admin-76';
-const VIP_PASSWORD = 'very-important-person';
-const OWNER_PASSWORD = '6shravan';
-const MESSAGE_LIMIT = 100;
-const USERNAME_LIMIT = 30;
-const SPAM_THRESHOLD = 5;
-const SPAM_WINDOW = 10000;
-const SPAM_COOLDOWN = 30000;
-
-let serverSettings = { autoModEnabled: false, slowModeEnabled: false, slowModeDuration: 5, serverMotd: '', maintenanceMode: false };
-const badWords = ['fuck','shit','bitch','ass','damn','nigga','bastard','crap','piss','dick','pussy','cock','fck','fuk','sht','btch','dmn','nigger','vagina'];
-
-const DATA_FILE = path.join(__dirname, 'casino_data.json');
-
-function loadData() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-      if (data.coins) Object.entries(data.coins).forEach(([k, v]) => userCoins.set(k, v));
-      if (data.announcements) persistentAnnouncements.push(...data.announcements);
-      if (data.stats) Object.entries(data.stats).forEach(([k, v]) => userStats.set(k, v));
-    }
-  } catch (e) { console.error('Load error:', e); }
-}
-
-function saveData() {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({
-      coins: Object.fromEntries(userCoins),
-      announcements: persistentAnnouncements,
-      stats: Object.fromEntries(userStats)
-    }));
-  } catch (e) { console.error('Save error:', e); }
-}
-
-loadData();
-setInterval(saveData, 30000);
-
-function getClientIp(req) {
-  const xff = req.headers['x-forwarded-for'];
-  let ip = (Array.isArray(xff) ? xff[0] : (xff || '')).split(',')[0].trim();
-  if (!ip) ip = req.socket?.remoteAddress || '';
-  if (ip.startsWith('::ffff:')) ip = ip.slice(7);
-  return ip || 'unknown';
-}
-
-function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
-function generateUUID() { return crypto.randomUUID(); }
-
-function broadcast(message, excludeWs = null) {
-  const data = JSON.stringify(message);
-  wss.clients.forEach(client => { if (client !== excludeWs && client.readyState === WebSocket.OPEN) client.send(data); });
-}
-
-function sendToUser(username, message) {
-  const ws = userSocketMap.get(username);
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
-}
-
-function getUserCoins(uuid) {
-  if (!userCoins.has(uuid)) userCoins.set(uuid, { coins: 100, lastDaily: 0, lastBeg: 0, lastWork: 0, lastRob: 0, lastGamble: 0, peaceMode: false, wins: 0, losses: 0, totalWon: 0, totalLost: 0 });
-  return userCoins.get(uuid);
-}
-
-function getUserStats(uuid) {
-  if (!userStats.has(uuid)) userStats.set(uuid, { gamesPlayed: 0, gamesWon: 0, betsPlaced: 0, betsWon: 0, totalEarned: 0, totalLost: 0, biggestWin: 0, currentStreak: 0, bestStreak: 0 });
-  return userStats.get(uuid);
-}
-
-function updateCoins(uuid, amount, username) {
-  const data = getUserCoins(uuid);
-  data.coins = Math.max(0, data.coins + amount);
-  if (amount > 0) data.totalWon = (data.totalWon || 0) + amount;
-  else data.totalLost = (data.totalLost || 0) + Math.abs(amount);
-  saveData();
-  sendToUser(username, { type: 'coinsUpdate', coins: data.coins });
-}
-
-function getLeaderboard() {
-  const allUsers = Array.from(users.values());
-  return Array.from(userCoins.entries())
-    .map(([uuid, data]) => {
-      const user = allUsers.find(u => u.uuid === uuid);
-      return { username: user?.username || null, coins: data.coins, uuid, wins: data.wins || 0 };
-    })
-    .filter(u => u.username)
-    .sort((a, b) => b.coins - a.coins)
-    .slice(0, 10);
-}
-
-function broadcastLeaderboard() {
-  broadcast({ type: 'leaderboard', leaderboard: getLeaderboard() });
-}
-
-function isIpBanned(ip) {
-  if (!ip || ip === 'unknown') return { banned: false };
-  if (bannedIPs.has(ip)) return { banned: true, kind: 'permanent' };
-  const meta = tempBannedIPs.get(ip);
-  if (meta) {
-    if (Date.now() < meta.until) return { banned: true, kind: 'temporary', until: meta.until };
-    tempBannedIPs.delete(ip);
-  }
-  return { banned: false };
-}
-
-function isUserTimedOut(username) {
-  if (!timedOutUsers.has(username)) return false;
-  if (Date.now() > timedOutUsers.get(username)) { timedOutUsers.delete(username); return false; }
-  return true;
-}
-
-function isUserMuted(username) {
-  if (!mutedUsers.has(username)) return false;
-  if (Date.now() > mutedUsers.get(username)) { mutedUsers.delete(username); return false; }
-  return true;
-}
-
-function checkSpam(username) {
-  const now = Date.now();
-  let tracker = spamTracker.get(username);
-  if (!tracker || now - tracker.firstMsgTime > SPAM_WINDOW) {
-    spamTracker.set(username, { count: 1, firstMsgTime: now });
-    return { spam: false };
-  }
-  tracker.count++;
-  if (tracker.count > SPAM_THRESHOLD) {
-    timedOutUsers.set(username, now + SPAM_COOLDOWN);
-    spamTracker.delete(username);
-    return { spam: true };
-  }
-  return { spam: false };
-}
-
-function checkSlowMode(username) {
-  if (!serverSettings.slowModeEnabled || adminUsers.has(username)) return { allowed: true };
-  const lastTime = lastMessageTime.get(username);
-  if (!lastTime) { lastMessageTime.set(username, Date.now()); return { allowed: true }; }
-  const timeSince = (Date.now() - lastTime) / 1000;
-  if (timeSince < serverSettings.slowModeDuration) return { allowed: false, waitTime: Math.ceil(serverSettings.slowModeDuration - timeSince) };
-  lastMessageTime.set(username, Date.now());
-  return { allowed: true };
-}
-
-function containsBadWords(text) {
-  const lower = text.toLowerCase();
-  for (const word of badWords) { if (new RegExp(`\\b${word}\\b`, 'i').test(lower)) return { found: true, word }; }
-  return { found: false };
-}
-
-function broadcastUserList() {
-  const userList = Array.from(users.values()).map(u => ({ username: u.username, isVIP: u.isVIP || false, isAdmin: u.isAdmin || false, isOwner: u.isOwner || false }));
-  broadcast({ type: 'userList', users: userList });
-}
-
-function requireAdmin(ws) {
-  const admin = users.get(ws);
-  if (!admin || !admin.isAdmin) { ws?.send(JSON.stringify({ type: 'error', message: 'Unauthorized' })); return null; }
-  return admin;
-}
-
-function requireOwner(ws) {
-  const owner = users.get(ws);
-  if (!owner || !owner.isOwner) { ws?.send(JSON.stringify({ type: 'error', message: 'Owner only' })); return null; }
-  return owner;
-}
-
-wss.on('connection', (ws, req) => {
-  const ip = getClientIp(req);
-  ws.ip = ip;
-  const ipStatus = isIpBanned(ip);
-  if (ipStatus.banned) {
-    ws.send(JSON.stringify({ type: 'banned', message: 'Your IP is banned' }));
-    setTimeout(() => ws.close(), 250);
-    return;
-  }
-  if (serverSettings.maintenanceMode) {
-    ws.send(JSON.stringify({ type: 'error', message: 'Server maintenance' }));
-    setTimeout(() => ws.close(), 250);
-    return;
-  }
-  ws.send(JSON.stringify({ type: 'connected' }));
-  ws.on('message', data => { try { handleMessage(ws, JSON.parse(data.toString())); } catch (e) {} });
-  ws.on('close', () => {
-    const user = users.get(ws);
-    if (user) {
-      userSocketMap.delete(user.username);
-      adminUsers.delete(user.username);
-      vipUsers.delete(user.username);
-      ownerUsers.delete(user.username);
-      users.delete(ws);
-      broadcastUserList();
-    }
-  });
-});
-
-function handleMessage(ws, msg) {
-  const handlers = {
-    join: handleJoin, message: handleChatMessage, getHistory: handleGetHistory, typing: handleTyping,
-    privateChatRequest: handlePrivateChatRequest, privateChatResponse: handlePrivateChatResponse,
-    privateMessage: handlePrivateMessage, getPrivateHistory: handleGetPrivateHistory,
-    addReaction: handleAddReaction, removeReaction: handleRemoveReaction,
-    getLeaderboard: (ws) => ws.send(JSON.stringify({ type: 'leaderboard', leaderboard: getLeaderboard() })),
-    challengeUser: handleChallengeUser, challengeResponse: handleChallengeResponse,
-    playerChoice: handlePlayerChoice, placeBet: handlePlaceBet,
-    getStealableUsers: handleGetStealableUsers,
-    adminKick: handleAdminKick, adminTimeout: handleAdminTimeout, adminBan: handleAdminBan,
-    adminUnban: handleAdminUnban, adminUnbanIP: handleAdminUnbanIP, adminWarning: handleAdminWarning,
-    adminFakeMessage: handleAdminFakeMessage, adminForceMute: handleAdminForceMute,
-    adminSpinScreen: handleAdminSpinScreen, adminInvertColors: handleAdminInvertColors,
-    adminShakeScreen: handleAdminShakeScreen, adminEmojiSpam: handleAdminEmojiSpam,
-    adminRickRoll: handleAdminRickRoll, adminForceDisconnect: handleAdminForceDisconnect,
-    adminFlipScreen: handleAdminFlipScreen, adminBroadcast: handleAdminBroadcast,
-    adminUpdateSettings: handleAdminUpdateSettings, adminClearChat: handleAdminClearChat,
-    adminDeleteMessage: handleAdminDeleteMessage, adminTempBanIP: handleAdminTempBanIP,
-    adminGetBanList: handleAdminGetBanList, adminGlobalMute: handleAdminGlobalMute,
-    adminRainbow: handleAdminRainbow, adminBlur: handleAdminBlur, adminMatrix: handleAdminMatrix,
-    adminConfetti: handleAdminConfetti, adminSlowMode: handleAdminSlowMode,
-    ownerGiveCoins: handleOwnerGiveCoins, ownerTakeCoins: handleOwnerTakeCoins,
-    ownerSwapCoins: handleOwnerSwapCoins, ownerSetCoins: handleOwnerSetCoins,
-    ownerResetUser: handleOwnerResetUser, ownerAnnouncement: handleOwnerAnnouncement,
-    ownerGlobalReset: handleOwnerGlobalReset, ownerMultiplyCoins: handleOwnerMultiplyCoins
-  };
-  if (handlers[msg.type]) handlers[msg.type](ws, msg);
-}
-
-function handleJoin(ws, msg) {
-  let { username, uuid, adminPassword, vipPassword, ownerPassword } = msg;
-  if (!username) username = 'Guest' + Math.floor(Math.random() * 1000);
-  username = username.slice(0, USERNAME_LIMIT).trim();
-  if (!uuid) uuid = generateUUID();
-  if (bannedUsers.has(username)) {
-    ws.send(JSON.stringify({ type: 'banned', message: 'Banned' }));
-    setTimeout(() => ws.close(), 250);
-    return;
-  }
-  const isVerifiedOwner = ownerPassword === OWNER_PASSWORD;
-  const isVerifiedAdmin = adminPassword === ADMIN_PASSWORD || isVerifiedOwner;
-  const isVerifiedVIP = vipPassword === VIP_PASSWORD;
-  if (isVerifiedOwner) ownerUsers.add(username);
-  if (isVerifiedAdmin) adminUsers.add(username);
-  if (isVerifiedVIP) vipUsers.add(username);
-  users.set(ws, { username, uuid, isAdmin: isVerifiedAdmin, isVIP: isVerifiedVIP, isOwner: isVerifiedOwner, ip: ws.ip, joinedAt: Date.now() });
-  userSocketMap.set(username, ws);
-  ipBanMap.set(username, ws.ip);
-  const coinData = getUserCoins(uuid);
-  const now = Date.now();
-  if (now - coinData.lastDaily > 86400000) { coinData.lastDaily = now; coinData.coins += 10; saveData(); }
-  ws.send(JSON.stringify({
-    type: 'joined', username, uuid, channels: Object.keys(channels),
-    isAdmin: isVerifiedAdmin, isVIP: isVerifiedVIP, isOwner: isVerifiedOwner,
-    coins: coinData.coins, peaceMode: coinData.peaceMode,
-    limits: { message: MESSAGE_LIMIT }, persistentAnnouncements
-  }));
-  if (serverSettings.serverMotd) ws.send(JSON.stringify({ type: 'broadcast', message: `📢 ${serverSettings.serverMotd}` }));
-  broadcastUserList();
-  broadcastLeaderboard();
-}
-
-function handleChatMessage(ws, msg) {
-  const user = users.get(ws);
-  if (!user) return;
-  if (isUserTimedOut(user.username)) return ws.send(JSON.stringify({ type: 'error', message: 'Timed out' }));
-  if (isUserMuted(user.username)) return ws.send(JSON.stringify({ type: 'error', message: 'Muted' }));
-  let { channel, text, replyTo } = msg;
-  if (!channel || typeof text !== 'string' || !text.trim()) return;
-  if (channel === 'announcements' && !user.isOwner) return ws.send(JSON.stringify({ type: 'error', message: 'Owner only' }));
-  if (text.startsWith('/')) { handleCommand(ws, user, text.trim()); return; }
-  if (!user.isAdmin && text.length > MESSAGE_LIMIT) return ws.send(JSON.stringify({ type: 'error', message: 'Too long' }));
-  if (!user.isAdmin && checkSpam(user.username).spam) return ws.send(JSON.stringify({ type: 'timedOut', duration: 30, message: 'Spam' }));
-  const slowCheck = checkSlowMode(user.username);
-  if (!slowCheck.allowed) return ws.send(JSON.stringify({ type: 'error', message: `Wait ${slowCheck.waitTime}s` }));
-  if (serverSettings.autoModEnabled && !user.isAdmin) {
-    const badCheck = containsBadWords(text);
-    if (badCheck.found) { timedOutUsers.set(user.username, Date.now() + 30000); return ws.send(JSON.stringify({ type: 'timedOut', duration: 30, message: 'Bad word' })); }
-  }
-  const chatMsg = { id: generateId(), author: user.username, text, channel, timestamp: new Date().toISOString(), isVIP: user.isVIP, isAdmin: user.isAdmin, isOwner: user.isOwner, replyTo: replyTo || null, reactions: {} };
-  if (channels[channel]) { channels[channel].push(chatMsg); if (channels[channel].length > 200) channels[channel].shift(); }
-  broadcast({ type: 'message', message: chatMsg });
-}
-
-function handleCommand(ws, user, text) {
-  const parts = text.split(' ');
-  const cmd = parts[0].toLowerCase();
-  const coinData = getUserCoins(user.uuid);
-  const stats = getUserStats(user.uuid);
-  const now = Date.now();
-
-  const commands = {
-    '/help': () => {
-      const helpText = `📋 Commands:
-/daily - Claim 100 coins (24h cooldown)
-/beg - Beg for coins (10s cooldown, 10% chance)
-/work - Work for coins (30s cooldown)
-/rob <user> - Rob someone (60s cooldown)
-/steal <user> - Steal coins (peace mode blocks)
-/coinflip <amount> <heads/tails> - Flip a coin
-/dice <amount> <odd/even> - Roll dice
-/slots <amount> - Play slots
-/blackjack <amount> - Play blackjack
-/give <user> <amount> - Give coins
-/balance - Check balance
-/stats - View your stats
-/leaderboard - Top 10 players
-/peace - Toggle peace mode
-/profile <user> - View profile`;
-      ws.send(JSON.stringify({ type: 'broadcast', message: helpText }));
-    },
-    '/daily': () => {
-      if (now - coinData.lastDaily < 86400000) {
-        const wait = Math.ceil((86400000 - (now - coinData.lastDaily)) / 3600000);
-        return ws.send(JSON.stringify({ type: 'error', message: `Wait ${wait}h` }));
-      }
-      coinData.lastDaily = now;
-      const streak = Math.floor((now - (coinData.dailyStreak || 0)) / 86400000) <= 1 ? (coinData.dailyStreakCount || 0) + 1 : 1;
-      coinData.dailyStreak = now;
-      coinData.dailyStreakCount = streak;
-      const bonus = Math.min(streak * 10, 100);
-      updateCoins(user.uuid, 100 + bonus, user.username);
-      ws.send(JSON.stringify({ type: 'broadcast', message: `💰 Daily: +${100 + bonus} coins! (Streak: ${streak} days)` }));
-    },
-    '/beg': () => {
-      if (now - coinData.lastBeg < 10000) return ws.send(JSON.stringify({ type: 'error', message: 'Wait 10s' }));
-      coinData.lastBeg = now;
-      if (Math.random() < 0.1) {
-        const amount = Math.floor(Math.random() * 91) + 10;
-        updateCoins(user.uuid, amount, user.username);
-        ws.send(JSON.stringify({ type: 'broadcast', message: `🙏 Someone gave you ${amount} coins!` }));
-      } else ws.send(JSON.stringify({ type: 'broadcast', message: '😔 No one helped...' }));
-    },
-    '/work': () => {
-      if (now - coinData.lastWork < 30000) return ws.send(JSON.stringify({ type: 'error', message: 'Wait 30s' }));
-      coinData.lastWork = now;
-      const jobs = ['delivered packages', 'washed cars', 'mowed lawns', 'walked dogs', 'fixed computers', 'sold lemonade'];
-      const job = jobs[Math.floor(Math.random() * jobs.length)];
-      const amount = Math.floor(Math.random() * 50) + 25;
-      updateCoins(user.uuid, amount, user.username);
-      ws.send(JSON.stringify({ type: 'broadcast', message: `💼 You ${job} and earned ${amount} coins!` }));
-    },
-    '/rob': () => {
-      const target = parts[1];
-      if (!target) return ws.send(JSON.stringify({ type: 'error', message: 'Usage: /rob <user>' }));
-      if (now - coinData.lastRob < 60000) return ws.send(JSON.stringify({ type: 'error', message: 'Wait 60s' }));
-      const targetUser = Array.from(users.values()).find(u => u.username.toLowerCase() === target.toLowerCase());
-      if (!targetUser) return ws.send(JSON.stringify({ type: 'error', message: 'User not found' }));
-      if (targetUser.username === user.username) return ws.send(JSON.stringify({ type: 'error', message: "Can't rob yourself" }));
-      coinData.lastRob = now;
-      const targetCoins = getUserCoins(targetUser.uuid);
-      if (targetCoins.peaceMode) return ws.send(JSON.stringify({ type: 'error', message: 'Target in peace mode' }));
-      if (Math.random() < 0.4) {
-        const amount = Math.floor(Math.min(targetCoins.coins * 0.3, 200));
-        if (amount > 0) {
-          updateCoins(targetUser.uuid, -amount, targetUser.username);
-          updateCoins(user.uuid, amount, user.username);
-          ws.send(JSON.stringify({ type: 'broadcast', message: `🔫 Robbed ${amount} from ${targetUser.username}!` }));
-          sendToUser(targetUser.username, { type: 'broadcast', message: `🔫 ${user.username} robbed ${amount} from you!` });
-        }
-      } else {
-        const fine = Math.floor(coinData.coins * 0.1);
-        updateCoins(user.uuid, -fine, user.username);
-        ws.send(JSON.stringify({ type: 'broadcast', message: `👮 Caught! Fined ${fine} coins` }));
-      }
-    },
-    '/steal': () => {
-      if (coinData.peaceMode) return ws.send(JSON.stringify({ type: 'error', message: 'You are in peace mode' }));
-      const target = parts.slice(1).join(' ');
-      if (!target) return ws.send(JSON.stringify({ type: 'showStealList' }));
-      const targetUser = Array.from(users.values()).find(u => u.username.toLowerCase() === target.toLowerCase());
-      if (!targetUser) return ws.send(JSON.stringify({ type: 'error', message: 'User not found' }));
-      const targetCoins = getUserCoins(targetUser.uuid);
-      if (targetCoins.peaceMode) return ws.send(JSON.stringify({ type: 'error', message: 'Peace mode' }));
-      if (targetCoins.coins === 0) return ws.send(JSON.stringify({ type: 'error', message: 'No coins' }));
-      if (Math.random() < 0.3) {
-        const amount = Math.floor(targetCoins.coins * (Math.random() * 0.4 + 0.1));
-        updateCoins(targetUser.uuid, -amount, targetUser.username);
-        updateCoins(user.uuid, amount, user.username);
-        ws.send(JSON.stringify({ type: 'broadcast', message: `💰 Stole ${amount} from ${targetUser.username}!` }));
-        sendToUser(targetUser.username, { type: 'broadcast', message: `😱 ${user.username} stole ${amount}!` });
-      } else ws.send(JSON.stringify({ type: 'broadcast', message: `❌ Failed to steal` }));
-    },
-    '/coinflip': () => {
-      const amount = parseInt(parts[1]);
-      const choice = parts[2]?.toLowerCase();
-      if (!amount || amount < 1) return ws.send(JSON.stringify({ type: 'error', message: 'Usage: /coinflip <amount> <heads/tails>' }));
-      if (!['heads', 'tails'].includes(choice)) return ws.send(JSON.stringify({ type: 'error', message: 'Choose heads or tails' }));
-      if (coinData.coins < amount) return ws.send(JSON.stringify({ type: 'error', message: 'Insufficient coins' }));
-      const result = Math.random() < 0.5 ? 'heads' : 'tails';
-      const won = result === choice;
-      updateCoins(user.uuid, won ? amount : -amount, user.username);
-      stats.gamesPlayed++;
+stats.gamesPlayed++;
       if (won) { stats.gamesWon++; stats.currentStreak++; stats.bestStreak = Math.max(stats.bestStreak, stats.currentStreak); stats.biggestWin = Math.max(stats.biggestWin, amount); }
       else stats.currentStreak = 0;
       saveData();
@@ -760,7 +335,7 @@ function handleGetHistory(ws, msg) { ws.send(JSON.stringify({ type: 'history', c
 function handleTyping(ws, msg) { const user = users.get(ws); if (!user) return; if (msg.isPrivate) sendToUser(msg.targetUsername, { type: 'typing', username: user.username, isTyping: msg.isTyping, isPrivate: true }); else broadcast({ type: 'typing', username: user.username, channel: msg.channel, isTyping: msg.isTyping }, ws); }
 function handlePrivateChatRequest(ws, msg) { const sender = users.get(ws); if (sender) sendToUser(msg.targetUsername, { type: 'privateChatRequest', from: sender.username }); }
 function handlePrivateChatResponse(ws, msg) { const responder = users.get(ws); if (!responder) return; const reqWs = userSocketMap.get(msg.from); if (!reqWs) return; if (msg.accepted) { const chatId = `dm_${[msg.from, responder.username].sort().join('_')}`; if (!privateChats.has(chatId)) privateChats.set(chatId, []); reqWs.send(JSON.stringify({ type: 'privateChatAccepted', chatId, with: responder.username })); ws.send(JSON.stringify({ type: 'privateChatAccepted', chatId, with: msg.from })); } else reqWs.send(JSON.stringify({ type: 'privateChatRejected', by: responder.username })); }
-function handlePrivateMessage(ws, msg) { const sender = users.get(ws); if (!sender) return; const { chatId, text, targetUsername, replyTo } = msg; if (!chatId || !text?.trim()) return; const pm = { id: generateId(), author: sender.username, text, chatId, timestamp: new Date().toISOString(), isVIP: sender.isVIP, isAdmin: sender.isAdmin, replyTo, reactions: {} }; if (!privateChats.has(chatId)) privateChats.set(chatId, []); privateChats.get(chatId).push(pm); ws.send(JSON.stringify({ type: 'privateMessage', message: pm })); sendToUser(targetUsername, { type: 'privateMessage', message: pm }); }
+function handlePrivateMessage(ws, msg) { const sender = users.get(ws); if (!sender) return; const { chatId, text, targetUsername, replyTo } = msg; if (!chatId || !text?.trim()) return; const pm = { id: generateId(), author: sender.username, text, chatId, timestamp: new Date().toISOString(), isVIP: sender.isVIP, isAdmin: sender.isAdmin, isOwner: sender.isOwner, replyTo, reactions: {} }; if (!privateChats.has(chatId)) privateChats.set(chatId, []); privateChats.get(chatId).push(pm); ws.send(JSON.stringify({ type: 'privateMessage', message: pm })); sendToUser(targetUsername, { type: 'privateMessage', message: pm }); }
 function handleGetPrivateHistory(ws, msg) { ws.send(JSON.stringify({ type: 'privateHistory', chatId: msg.chatId, messages: privateChats.get(msg.chatId) || [] })); }
 function handleAddReaction(ws, msg) { const user = users.get(ws); if (!user) return; const { messageId, emoji, channel, isPrivate, chatId } = msg; const msgList = isPrivate ? privateChats.get(chatId) : channels[channel]; const message = msgList?.find(m => m.id === messageId); if (!message) return; if (!message.reactions) message.reactions = {}; if (!message.reactions[emoji]) message.reactions[emoji] = []; if (!message.reactions[emoji].includes(user.username)) { message.reactions[emoji].push(user.username); broadcast({ type: 'reactionUpdate', messageId, reactions: message.reactions, channel, isPrivate, chatId }); } }
 function handleRemoveReaction(ws, msg) { const user = users.get(ws); if (!user) return; const { messageId, emoji, channel, isPrivate, chatId } = msg; const msgList = isPrivate ? privateChats.get(chatId) : channels[channel]; const message = msgList?.find(m => m.id === messageId); if (!message?.reactions?.[emoji]) return; message.reactions[emoji] = message.reactions[emoji].filter(u => u !== user.username); if (!message.reactions[emoji].length) delete message.reactions[emoji]; broadcast({ type: 'reactionUpdate', messageId, reactions: message.reactions, channel, isPrivate, chatId }); }
@@ -794,7 +369,567 @@ function handleAdminClearChat(ws, msg) { if (!requireAdmin(ws)) return; if (chan
 function handleAdminDeleteMessage(ws, msg) { if (!requireAdmin(ws)) return; if (channels[msg.channel]) { channels[msg.channel] = channels[msg.channel].filter(m => m.id !== msg.messageId); broadcast({ type: 'messageDeleted', messageId: msg.messageId, channel: msg.channel }); } ws.send(JSON.stringify({ type: 'adminActionSuccess' })); }
 function handleAdminSlowMode(ws, msg) { if (!requireAdmin(ws)) return; serverSettings.slowModeEnabled = msg.enabled; if (!msg.enabled) lastMessageTime.clear(); broadcast({ type: 'broadcast', message: msg.enabled ? `🐌 Slow mode ON (${serverSettings.slowModeDuration}s)` : '⚡ Slow mode OFF' }); ws.send(JSON.stringify({ type: 'adminActionSuccess' })); }
 
-app.get('/health', (req, res) => res.json({ status: 'ok', users: users.size }));
+app.get('/health', (req, res) => res.json({ status: 'ok', users: users.size, voiceUsers: voiceUserStates.size }));
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server on port ${PORT}`));
-process.on('SIGINT', () => { saveData(); process.exit(); });
+server.listen(PORT, () => console.log(`Server on port ${PORT} with voice chat support`));
+process.on('SIGINT', () => { saveData(); process.exit(); });const express = require('express');
+const http = require('http');
+const WebSocket = require('ws');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
+
+const channels = { announcements: [], general: [], gaming: [], memes: [] };
+const users = new Map();
+const privateChats = new Map();
+const userSocketMap = new Map();
+const bannedUsers = new Set();
+const timedOutUsers = new Map();
+const bannedIPs = new Set();
+const tempBannedIPs = new Map();
+const ipBanMap = new Map();
+const lastMessageTime = new Map();
+const spamTracker = new Map();
+const mutedUsers = new Map();
+const userWarnings = new Map();
+const userCoins = new Map();
+const activeGames = new Map();
+const gameBets = new Map();
+const persistentAnnouncements = [];
+const adminUsers = new Set();
+const vipUsers = new Set();
+const ownerUsers = new Set();
+const adminActions = [];
+const userStats = new Map();
+
+// Voice chat tracking
+const voiceChannels = new Map(); // channel -> Set of usernames
+const voiceUserStates = new Map(); // username -> {channel, muted}
+
+const ADMIN_PASSWORD = 'classic-admin-76';
+const VIP_PASSWORD = 'very-important-person';
+const OWNER_PASSWORD = '6shravan';
+const MESSAGE_LIMIT = 100;
+const USERNAME_LIMIT = 30;
+const SPAM_THRESHOLD = 5;
+const SPAM_WINDOW = 10000;
+const SPAM_COOLDOWN = 30000;
+
+let serverSettings = { autoModEnabled: false, slowModeEnabled: false, slowModeDuration: 5, serverMotd: '', maintenanceMode: false };
+const badWords = ['fuck','shit','bitch','ass','damn','nigga','bastard','crap','piss','dick','pussy','cock','fck','fuk','sht','btch','dmn','nigger','vagina'];
+
+const DATA_FILE = path.join(__dirname, 'casino_data.json');
+
+function loadData() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+      if (data.coins) Object.entries(data.coins).forEach(([k, v]) => userCoins.set(k, v));
+      if (data.announcements) persistentAnnouncements.push(...data.announcements);
+      if (data.stats) Object.entries(data.stats).forEach(([k, v]) => userStats.set(k, v));
+    }
+  } catch (e) { console.error('Load error:', e); }
+}
+
+function saveData() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify({
+      coins: Object.fromEntries(userCoins),
+      announcements: persistentAnnouncements,
+      stats: Object.fromEntries(userStats)
+    }));
+  } catch (e) { console.error('Save error:', e); }
+}
+
+loadData();
+setInterval(saveData, 30000);
+
+function getClientIp(req) {
+  const xff = req.headers['x-forwarded-for'];
+  let ip = (Array.isArray(xff) ? xff[0] : (xff || '')).split(',')[0].trim();
+  if (!ip) ip = req.socket?.remoteAddress || '';
+  if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+  return ip || 'unknown';
+}
+
+function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
+function generateUUID() { return crypto.randomUUID(); }
+
+function broadcast(message, excludeWs = null) {
+  const data = JSON.stringify(message);
+  wss.clients.forEach(client => { if (client !== excludeWs && client.readyState === WebSocket.OPEN) client.send(data); });
+}
+
+function sendToUser(username, message) {
+  const ws = userSocketMap.get(username);
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
+}
+
+function getUserCoins(uuid) {
+  if (!userCoins.has(uuid)) userCoins.set(uuid, { coins: 100, lastDaily: 0, lastBeg: 0, lastWork: 0, lastRob: 0, lastGamble: 0, peaceMode: false, wins: 0, losses: 0, totalWon: 0, totalLost: 0 });
+  return userCoins.get(uuid);
+}
+
+function getUserStats(uuid) {
+  if (!userStats.has(uuid)) userStats.set(uuid, { gamesPlayed: 0, gamesWon: 0, betsPlaced: 0, betsWon: 0, totalEarned: 0, totalLost: 0, biggestWin: 0, currentStreak: 0, bestStreak: 0 });
+  return userStats.get(uuid);
+}
+
+function updateCoins(uuid, amount, username) {
+  const data = getUserCoins(uuid);
+  data.coins = Math.max(0, data.coins + amount);
+  if (amount > 0) data.totalWon = (data.totalWon || 0) + amount;
+  else data.totalLost = (data.totalLost || 0) + Math.abs(amount);
+  saveData();
+  sendToUser(username, { type: 'coinsUpdate', coins: data.coins });
+}
+
+function getLeaderboard() {
+  const allUsers = Array.from(users.values());
+  return Array.from(userCoins.entries())
+    .map(([uuid, data]) => {
+      const user = allUsers.find(u => u.uuid === uuid);
+      return { username: user?.username || null, coins: data.coins, uuid, wins: data.wins || 0 };
+    })
+    .filter(u => u.username)
+    .sort((a, b) => b.coins - a.coins)
+    .slice(0, 10);
+}
+
+function broadcastLeaderboard() {
+  broadcast({ type: 'leaderboard', leaderboard: getLeaderboard() });
+}
+
+function isIpBanned(ip) {
+  if (!ip || ip === 'unknown') return { banned: false };
+  if (bannedIPs.has(ip)) return { banned: true, kind: 'permanent' };
+  const meta = tempBannedIPs.get(ip);
+  if (meta) {
+    if (Date.now() < meta.until) return { banned: true, kind: 'temporary', until: meta.until };
+    tempBannedIPs.delete(ip);
+  }
+  return { banned: false };
+}
+
+function isUserTimedOut(username) {
+  if (!timedOutUsers.has(username)) return false;
+  if (Date.now() > timedOutUsers.get(username)) { timedOutUsers.delete(username); return false; }
+  return true;
+}
+
+function isUserMuted(username) {
+  if (!mutedUsers.has(username)) return false;
+  if (Date.now() > mutedUsers.get(username)) { mutedUsers.delete(username); return false; }
+  return true;
+}
+
+function checkSpam(username) {
+  const now = Date.now();
+  let tracker = spamTracker.get(username);
+  if (!tracker || now - tracker.firstMsgTime > SPAM_WINDOW) {
+    spamTracker.set(username, { count: 1, firstMsgTime: now });
+    return { spam: false };
+  }
+  tracker.count++;
+  if (tracker.count > SPAM_THRESHOLD) {
+    timedOutUsers.set(username, now + SPAM_COOLDOWN);
+    spamTracker.delete(username);
+    return { spam: true };
+  }
+  return { spam: false };
+}
+
+function checkSlowMode(username) {
+  if (!serverSettings.slowModeEnabled || adminUsers.has(username)) return { allowed: true };
+  const lastTime = lastMessageTime.get(username);
+  if (!lastTime) { lastMessageTime.set(username, Date.now()); return { allowed: true }; }
+  const timeSince = (Date.now() - lastTime) / 1000;
+  if (timeSince < serverSettings.slowModeDuration) return { allowed: false, waitTime: Math.ceil(serverSettings.slowModeDuration - timeSince) };
+  lastMessageTime.set(username, Date.now());
+  return { allowed: true };
+}
+
+function containsBadWords(text) {
+  const lower = text.toLowerCase();
+  for (const word of badWords) { if (new RegExp(`\\b${word}\\b`, 'i').test(lower)) return { found: true, word }; }
+  return { found: false };
+}
+
+function broadcastUserList() {
+  const userList = Array.from(users.values()).map(u => ({ username: u.username, isVIP: u.isVIP || false, isAdmin: u.isAdmin || false, isOwner: u.isOwner || false }));
+  broadcast({ type: 'userList', users: userList });
+}
+
+function requireAdmin(ws) {
+  const admin = users.get(ws);
+  if (!admin || !admin.isAdmin) { ws?.send(JSON.stringify({ type: 'error', message: 'Unauthorized' })); return null; }
+  return admin;
+}
+
+function requireOwner(ws) {
+  const owner = users.get(ws);
+  if (!owner || !owner.isOwner) { ws?.send(JSON.stringify({ type: 'error', message: 'Owner only' })); return null; }
+  return owner;
+}
+
+// Voice Chat Functions
+function joinVoiceChannel(username, channel) {
+  // Leave current channel if in one
+  leaveVoiceChannel(username);
+  
+  // Join new channel
+  if (!voiceChannels.has(channel)) {
+    voiceChannels.set(channel, new Set());
+  }
+  voiceChannels.get(channel).add(username);
+  voiceUserStates.set(username, { channel, muted: false });
+  
+  // Notify user of other users in channel
+  const usersInChannel = Array.from(voiceChannels.get(channel)).filter(u => u !== username);
+  sendToUser(username, { type: 'voiceChannelUsers', channel, users: usersInChannel });
+  
+  // Notify others that user joined
+  usersInChannel.forEach(u => {
+    sendToUser(u, { type: 'voiceUserJoined', username, channel });
+  });
+  
+  console.log(`${username} joined voice channel: ${channel}`);
+}
+
+function leaveVoiceChannel(username) {
+  const state = voiceUserStates.get(username);
+  if (!state) return;
+  
+  const channel = state.channel;
+  const channelUsers = voiceChannels.get(channel);
+  
+  if (channelUsers) {
+    channelUsers.delete(username);
+    if (channelUsers.size === 0) {
+      voiceChannels.delete(channel);
+    } else {
+      // Notify others that user left
+      channelUsers.forEach(u => {
+        sendToUser(u, { type: 'voiceUserLeft', username, channel });
+      });
+    }
+  }
+  
+  voiceUserStates.delete(username);
+  console.log(`${username} left voice channel: ${channel}`);
+}
+
+function setVoiceMuted(username, muted) {
+  const state = voiceUserStates.get(username);
+  if (!state) return;
+  
+  state.muted = muted;
+  
+  // Notify others in channel
+  const channelUsers = voiceChannels.get(state.channel);
+  if (channelUsers) {
+    channelUsers.forEach(u => {
+      if (u !== username) {
+        sendToUser(u, { type: 'voiceUserMuted', username, muted, channel: state.channel });
+      }
+    });
+  }
+}
+
+function relayVoiceSignal(fromUser, targetUser, signalType, data) {
+  // Relay WebRTC signaling between peers
+  sendToUser(targetUser, {
+    type: signalType,
+    from: fromUser,
+    ...data
+  });
+}
+
+wss.on('connection', (ws, req) => {
+  const ip = getClientIp(req);
+  ws.ip = ip;
+  const ipStatus = isIpBanned(ip);
+  if (ipStatus.banned) {
+    ws.send(JSON.stringify({ type: 'banned', message: 'Your IP is banned' }));
+    setTimeout(() => ws.close(), 250);
+    return;
+  }
+  if (serverSettings.maintenanceMode) {
+    ws.send(JSON.stringify({ type: 'error', message: 'Server maintenance' }));
+    setTimeout(() => ws.close(), 250);
+    return;
+  }
+  ws.send(JSON.stringify({ type: 'connected' }));
+  ws.on('message', data => { try { handleMessage(ws, JSON.parse(data.toString())); } catch (e) {} });
+  ws.on('close', () => {
+    const user = users.get(ws);
+    if (user) {
+      // Leave voice channel on disconnect
+      leaveVoiceChannel(user.username);
+      
+      userSocketMap.delete(user.username);
+      adminUsers.delete(user.username);
+      vipUsers.delete(user.username);
+      ownerUsers.delete(user.username);
+      users.delete(ws);
+      broadcastUserList();
+    }
+  });
+});
+
+function handleMessage(ws, msg) {
+  const handlers = {
+    join: handleJoin, message: handleChatMessage, getHistory: handleGetHistory, typing: handleTyping,
+    privateChatRequest: handlePrivateChatRequest, privateChatResponse: handlePrivateChatResponse,
+    privateMessage: handlePrivateMessage, getPrivateHistory: handleGetPrivateHistory,
+    addReaction: handleAddReaction, removeReaction: handleRemoveReaction,
+    getLeaderboard: (ws) => ws.send(JSON.stringify({ type: 'leaderboard', leaderboard: getLeaderboard() })),
+    challengeUser: handleChallengeUser, challengeResponse: handleChallengeResponse,
+    playerChoice: handlePlayerChoice, placeBet: handlePlaceBet,
+    getStealableUsers: handleGetStealableUsers,
+    adminKick: handleAdminKick, adminTimeout: handleAdminTimeout, adminBan: handleAdminBan,
+    adminUnban: handleAdminUnban, adminUnbanIP: handleAdminUnbanIP, adminWarning: handleAdminWarning,
+    adminFakeMessage: handleAdminFakeMessage, adminForceMute: handleAdminForceMute,
+    adminSpinScreen: handleAdminSpinScreen, adminInvertColors: handleAdminInvertColors,
+    adminShakeScreen: handleAdminShakeScreen, adminEmojiSpam: handleAdminEmojiSpam,
+    adminRickRoll: handleAdminRickRoll, adminForceDisconnect: handleAdminForceDisconnect,
+    adminFlipScreen: handleAdminFlipScreen, adminBroadcast: handleAdminBroadcast,
+    adminUpdateSettings: handleAdminUpdateSettings, adminClearChat: handleAdminClearChat,
+    adminDeleteMessage: handleAdminDeleteMessage, adminTempBanIP: handleAdminTempBanIP,
+    adminGetBanList: handleAdminGetBanList, adminGlobalMute: handleAdminGlobalMute,
+    adminRainbow: handleAdminRainbow, adminBlur: handleAdminBlur, adminMatrix: handleAdminMatrix,
+    adminConfetti: handleAdminConfetti, adminSlowMode: handleAdminSlowMode,
+    ownerGiveCoins: handleOwnerGiveCoins, ownerTakeCoins: handleOwnerTakeCoins,
+    ownerSwapCoins: handleOwnerSwapCoins, ownerSetCoins: handleOwnerSetCoins,
+    ownerResetUser: handleOwnerResetUser, ownerAnnouncement: handleOwnerAnnouncement,
+    ownerGlobalReset: handleOwnerGlobalReset, ownerMultiplyCoins: handleOwnerMultiplyCoins,
+    // Voice chat handlers
+    voiceJoin: handleVoiceJoin,
+    voiceLeave: handleVoiceLeave,
+    voiceMute: handleVoiceMute,
+    voiceOffer: handleVoiceOffer,
+    voiceAnswer: handleVoiceAnswer,
+    voiceIceCandidate: handleVoiceIceCandidate
+  };
+  if (handlers[msg.type]) handlers[msg.type](ws, msg);
+}
+
+// Voice Chat Handlers
+function handleVoiceJoin(ws, msg) {
+  const user = users.get(ws);
+  if (!user) return;
+  joinVoiceChannel(user.username, msg.channel);
+}
+
+function handleVoiceLeave(ws, msg) {
+  const user = users.get(ws);
+  if (!user) return;
+  leaveVoiceChannel(user.username);
+}
+
+function handleVoiceMute(ws, msg) {
+  const user = users.get(ws);
+  if (!user) return;
+  setVoiceMuted(user.username, msg.muted);
+}
+
+function handleVoiceOffer(ws, msg) {
+  const user = users.get(ws);
+  if (!user) return;
+  relayVoiceSignal(user.username, msg.target, 'voiceOffer', {
+    offer: msg.offer,
+    channel: msg.channel
+  });
+}
+
+function handleVoiceAnswer(ws, msg) {
+  const user = users.get(ws);
+  if (!user) return;
+  relayVoiceSignal(user.username, msg.target, 'voiceAnswer', {
+    answer: msg.answer,
+    channel: msg.channel
+  });
+}
+
+function handleVoiceIceCandidate(ws, msg) {
+  const user = users.get(ws);
+  if (!user) return;
+  relayVoiceSignal(user.username, msg.target, 'voiceIceCandidate', {
+    candidate: msg.candidate,
+    channel: msg.channel
+  });
+}
+
+function handleJoin(ws, msg) {
+  let { username, uuid, adminPassword, vipPassword, ownerPassword } = msg;
+  if (!username) username = 'Guest' + Math.floor(Math.random() * 1000);
+  username = username.slice(0, USERNAME_LIMIT).trim();
+  if (!uuid) uuid = generateUUID();
+  if (bannedUsers.has(username)) {
+    ws.send(JSON.stringify({ type: 'banned', message: 'Banned' }));
+    setTimeout(() => ws.close(), 250);
+    return;
+  }
+  const isVerifiedOwner = ownerPassword === OWNER_PASSWORD;
+  const isVerifiedAdmin = adminPassword === ADMIN_PASSWORD || isVerifiedOwner;
+  const isVerifiedVIP = vipPassword === VIP_PASSWORD;
+  if (isVerifiedOwner) ownerUsers.add(username);
+  if (isVerifiedAdmin) adminUsers.add(username);
+  if (isVerifiedVIP) vipUsers.add(username);
+  users.set(ws, { username, uuid, isAdmin: isVerifiedAdmin, isVIP: isVerifiedVIP, isOwner: isVerifiedOwner, ip: ws.ip, joinedAt: Date.now() });
+  userSocketMap.set(username, ws);
+  ipBanMap.set(username, ws.ip);
+  const coinData = getUserCoins(uuid);
+  const now = Date.now();
+  if (now - coinData.lastDaily > 86400000) { coinData.lastDaily = now; coinData.coins += 10; saveData(); }
+  ws.send(JSON.stringify({
+    type: 'joined', username, uuid, channels: Object.keys(channels),
+    isAdmin: isVerifiedAdmin, isVIP: isVerifiedVIP, isOwner: isVerifiedOwner,
+    coins: coinData.coins, peaceMode: coinData.peaceMode,
+    limits: { message: MESSAGE_LIMIT }, persistentAnnouncements
+  }));
+  if (serverSettings.serverMotd) ws.send(JSON.stringify({ type: 'broadcast', message: `📢 ${serverSettings.serverMotd}` }));
+  broadcastUserList();
+  broadcastLeaderboard();
+}
+
+function handleChatMessage(ws, msg) {
+  const user = users.get(ws);
+  if (!user) return;
+  if (isUserTimedOut(user.username)) return ws.send(JSON.stringify({ type: 'error', message: 'Timed out' }));
+  if (isUserMuted(user.username)) return ws.send(JSON.stringify({ type: 'error', message: 'Muted' }));
+  let { channel, text, replyTo } = msg;
+  if (!channel || typeof text !== 'string' || !text.trim()) return;
+  if (channel === 'announcements' && !user.isOwner) return ws.send(JSON.stringify({ type: 'error', message: 'Owner only' }));
+  if (text.startsWith('/')) { handleCommand(ws, user, text.trim()); return; }
+  if (!user.isAdmin && text.length > MESSAGE_LIMIT) return ws.send(JSON.stringify({ type: 'error', message: 'Too long' }));
+  if (!user.isAdmin && checkSpam(user.username).spam) return ws.send(JSON.stringify({ type: 'timedOut', duration: 30, message: 'Spam' }));
+  const slowCheck = checkSlowMode(user.username);
+  if (!slowCheck.allowed) return ws.send(JSON.stringify({ type: 'error', message: `Wait ${slowCheck.waitTime}s` }));
+  if (serverSettings.autoModEnabled && !user.isAdmin) {
+    const badCheck = containsBadWords(text);
+    if (badCheck.found) { timedOutUsers.set(user.username, Date.now() + 30000); return ws.send(JSON.stringify({ type: 'timedOut', duration: 30, message: 'Bad word' })); }
+  }
+  const chatMsg = { id: generateId(), author: user.username, text, channel, timestamp: new Date().toISOString(), isVIP: user.isVIP, isAdmin: user.isAdmin, isOwner: user.isOwner, replyTo: replyTo || null, reactions: {} };
+  if (channels[channel]) { channels[channel].push(chatMsg); if (channels[channel].length > 200) channels[channel].shift(); }
+  broadcast({ type: 'message', message: chatMsg });
+}
+
+function handleCommand(ws, user, text) {
+  const parts = text.split(' ');
+  const cmd = parts[0].toLowerCase();
+  const coinData = getUserCoins(user.uuid);
+  const stats = getUserStats(user.uuid);
+  const now = Date.now();
+
+  const commands = {
+    '/help': () => {
+      const helpText = `📋 Commands:
+/daily - Claim 100 coins (24h cooldown)
+/beg - Beg for coins (10s cooldown, 10% chance)
+/work - Work for coins (30s cooldown)
+/rob <user> - Rob someone (60s cooldown)
+/steal <user> - Steal coins (peace mode blocks)
+/coinflip <amount> <heads/tails> - Flip a coin
+/dice <amount> <odd/even> - Roll dice
+/slots <amount> - Play slots
+/blackjack <amount> - Play blackjack
+/give <user> <amount> - Give coins
+/balance - Check balance
+/stats - View your stats
+/leaderboard - Top 10 players
+/peace - Toggle peace mode
+/profile <user> - View profile`;
+      ws.send(JSON.stringify({ type: 'broadcast', message: helpText }));
+    },
+    '/daily': () => {
+      if (now - coinData.lastDaily < 86400000) {
+        const wait = Math.ceil((86400000 - (now - coinData.lastDaily)) / 3600000);
+        return ws.send(JSON.stringify({ type: 'error', message: `Wait ${wait}h` }));
+      }
+      coinData.lastDaily = now;
+      const streak = Math.floor((now - (coinData.dailyStreak || 0)) / 86400000) <= 1 ? (coinData.dailyStreakCount || 0) + 1 : 1;
+      coinData.dailyStreak = now;
+      coinData.dailyStreakCount = streak;
+      const bonus = Math.min(streak * 10, 100);
+      updateCoins(user.uuid, 100 + bonus, user.username);
+      ws.send(JSON.stringify({ type: 'broadcast', message: `💰 Daily: +${100 + bonus} coins! (Streak: ${streak} days)` }));
+    },
+    '/beg': () => {
+      if (now - coinData.lastBeg < 10000) return ws.send(JSON.stringify({ type: 'error', message: 'Wait 10s' }));
+      coinData.lastBeg = now;
+      if (Math.random() < 0.1) {
+        const amount = Math.floor(Math.random() * 91) + 10;
+        updateCoins(user.uuid, amount, user.username);
+        ws.send(JSON.stringify({ type: 'broadcast', message: `🙏 Someone gave you ${amount} coins!` }));
+      } else ws.send(JSON.stringify({ type: 'broadcast', message: '😔 No one helped...' }));
+    },
+    '/work': () => {
+      if (now - coinData.lastWork < 30000) return ws.send(JSON.stringify({ type: 'error', message: 'Wait 30s' }));
+      coinData.lastWork = now;
+      const jobs = ['delivered packages', 'washed cars', 'mowed lawns', 'walked dogs', 'fixed computers', 'sold lemonade'];
+      const job = jobs[Math.floor(Math.random() * jobs.length)];
+      const amount = Math.floor(Math.random() * 50) + 25;
+      updateCoins(user.uuid, amount, user.username);
+      ws.send(JSON.stringify({ type: 'broadcast', message: `💼 You ${job} and earned ${amount} coins!` }));
+    },
+    '/rob': () => {
+      const target = parts[1];
+      if (!target) return ws.send(JSON.stringify({ type: 'error', message: 'Usage: /rob <user>' }));
+      if (now - coinData.lastRob < 60000) return ws.send(JSON.stringify({ type: 'error', message: 'Wait 60s' }));
+      const targetUser = Array.from(users.values()).find(u => u.username.toLowerCase() === target.toLowerCase());
+      if (!targetUser) return ws.send(JSON.stringify({ type: 'error', message: 'User not found' }));
+      if (targetUser.username === user.username) return ws.send(JSON.stringify({ type: 'error', message: "Can't rob yourself" }));
+      coinData.lastRob = now;
+      const targetCoins = getUserCoins(targetUser.uuid);
+      if (targetCoins.peaceMode) return ws.send(JSON.stringify({ type: 'error', message: 'Target in peace mode' }));
+      if (Math.random() < 0.4) {
+        const amount = Math.floor(Math.min(targetCoins.coins * 0.3, 200));
+        if (amount > 0) {
+          updateCoins(targetUser.uuid, -amount, targetUser.username);
+          updateCoins(user.uuid, amount, user.username);
+          ws.send(JSON.stringify({ type: 'broadcast', message: `🔫 Robbed ${amount} from ${targetUser.username}!` }));
+          sendToUser(targetUser.username, { type: 'broadcast', message: `🔫 ${user.username} robbed ${amount} from you!` });
+        }
+      } else {
+        const fine = Math.floor(coinData.coins * 0.1);
+        updateCoins(user.uuid, -fine, user.username);
+        ws.send(JSON.stringify({ type: 'broadcast', message: `👮 Caught! Fined ${fine} coins` }));
+      }
+    },
+    '/steal': () => {
+      if (coinData.peaceMode) return ws.send(JSON.stringify({ type: 'error', message: 'You are in peace mode' }));
+      const target = parts.slice(1).join(' ');
+      if (!target) return ws.send(JSON.stringify({ type: 'showStealList' }));
+      const targetUser = Array.from(users.values()).find(u => u.username.toLowerCase() === target.toLowerCase());
+      if (!targetUser) return ws.send(JSON.stringify({ type: 'error', message: 'User not found' }));
+      const targetCoins = getUserCoins(targetUser.uuid);
+      if (targetCoins.peaceMode) return ws.send(JSON.stringify({ type: 'error', message: 'Peace mode' }));
+      if (targetCoins.coins === 0) return ws.send(JSON.stringify({ type: 'error', message: 'No coins' }));
+      if (Math.random() < 0.3) {
+        const amount = Math.floor(targetCoins.coins * (Math.random() * 0.4 + 0.1));
+        updateCoins(targetUser.uuid, -amount, targetUser.username);
+        updateCoins(user.uuid, amount, user.username);
+        ws.send(JSON.stringify({ type: 'broadcast', message: `💰 Stole ${amount} from ${targetUser.username}!` }));
+        sendToUser(targetUser.username, { type: 'broadcast', message: `😱 ${user.username} stole ${amount}!` });
+      } else ws.send(JSON.stringify({ type: 'broadcast', message: `❌ Failed to steal` }));
+    },
+    '/coinflip': () => {
+      const amount = parseInt(parts[1]);
+      const choice = parts[2]?.toLowerCase();
+      if (!amount || amount < 1) return ws.send(JSON.stringify({ type: 'error', message: 'Usage: /coinflip <amount> <heads/tails>' }));
+      if (!['heads', 'tails'].includes(choice)) return ws.send(JSON.stringify({ type: 'error', message: 'Choose heads or tails' }));
+      if (coinData.coins < amount) return ws.send(JSON.stringify({ type: 'error', message: 'Insufficient coins' }));
+      const result = Math.random() < 0.5 ? 'heads' : 'tails';
+      const won = result === choice;
+      updateCoins(user.uuid, won ? amount : -amount, user.username);
+      stats.gamesPlayed++;
+      if (won) { stats.gamesWon++; stats.currentStreak++; stats.bestStreak = Math.max(stats.bestStreak, stats.currentStreak); stats.biggestWin = Math.max(stats.biggestWin, amount); }
+      else stats
