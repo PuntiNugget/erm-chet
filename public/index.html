@@ -21,6 +21,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 .channel-name::before{content:'#';margin-right:6px;font-weight:600;color:#72767d}
 .channel.private .channel-name::before{content:'@';color:#5865f2}
 .channel.voice .channel-name::before{content:'🔊';margin-right:4px}
+.channel.voice.connected{background:#3ba55d;color:#fff}
+.channel.voice.connected .channel-name::before{content:'🎤'}
 .close-dm{opacity:0;background:none;border:none;color:#96989d;cursor:pointer;font-size:16px;transition:opacity .2s}
 .channel:hover .close-dm{opacity:1}
 .close-dm:hover{color:#ed4245}
@@ -506,6 +508,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 </div>
 </div>
 </div>
+<div class="voice-controls" id="voiceControls">
+<div class="voice-users" id="voiceUsersList"></div>
+<div class="voice-status" id="voiceStatus">Lobby</div>
+<button class="voice-btn mute" id="muteSelf" title="Mute">🎤</button>
+<button class="voice-btn deafen" id="deafenSelf" title="Deafen">🔊</button>
+<button class="voice-btn disconnect" id="disconnectVoice" title="Disconnect">✖️</button>
+</div>
 <div class="container">
 <div class="sidebar">
 <div class="server-header">The Chet</div>
@@ -570,6 +579,10 @@ let ws,connected=false,username='',uuid=null,isAdmin=false,isVIP=false,isOwner=f
 let curChan='general',chatType='channel',curDM=null,replyTo=null,selGame=null,selChoice=null,curGameId=null;
 const messages={},dmMessages={},dmPartners={},users=[];
 const $=id=>document.getElementById(id);
+
+// Voice chat variables
+let voiceChannel=null,localStream=null,peerConnections={},isMuted=false,isDeafened=false;
+const voiceUsers=new Map();
 
 // Wait for username before connecting
 uuid=localStorage.getItem('uuid')||null;
@@ -661,7 +674,15 @@ function handle(d){
     emojiSpam:()=>{for(let i=0;i<20;i++)setTimeout(()=>{const e=document.createElement('div');e.textContent=['😂','🔥','💀','🎉'][Math.floor(Math.random()*4)];e.style.cssText=`position:fixed;font-size:48px;left:${Math.random()*100}vw;top:${Math.random()*100}vh;pointer-events:none;z-index:9999`;document.body.appendChild(e);setTimeout(()=>e.remove(),2000)},i*100)},
     confetti:()=>{const cols=['#ff0','#f0f','#0ff','#f00','#0f0'];for(let i=0;i<50;i++)setTimeout(()=>{const c=document.createElement('div');c.className='confetti';c.style.cssText=`left:${Math.random()*100}%;top:-10px;background:${cols[Math.floor(Math.random()*5)]}`;document.body.appendChild(c);setTimeout(()=>c.remove(),3000)},i*40)},
     rickRoll:()=>window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ','_blank'),
-    forceDisconnect:()=>{alert('Disconnected by admin');ws.close()}
+    forceDisconnect:()=>{alert('Disconnected by admin');ws.close()},
+    // Voice chat messages
+    voiceOffer:d=>handleVoiceOffer(d),
+    voiceAnswer:d=>handleVoiceAnswer(d),
+    voiceIceCandidate:d=>handleVoiceIceCandidate(d),
+    voiceUserJoined:d=>handleVoiceUserJoined(d),
+    voiceUserLeft:d=>handleVoiceUserLeft(d),
+    voiceUserMuted:d=>handleVoiceUserMuted(d),
+    voiceChannelUsers:d=>handleVoiceChannelUsers(d)
   };
   if(h[d.type])h[d.type]();
 }
@@ -780,6 +801,177 @@ function placeBet(gid){
 function acceptGame(gid,choice){document.getElementById('gc-'+gid)?.remove();send({type:'challengeResponse',gameId:gid,accepted:true,choice})}
 function declineGame(gid,el){el.closest('.notif')?.remove();send({type:'challengeResponse',gameId:gid,accepted:false})}
 
+// Voice Chat Functions
+async function joinVoiceChannel(channel){
+  try{
+    localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    voiceChannel=channel;
+    document.querySelectorAll('.channel.voice').forEach(c=>c.classList.remove('connected'));
+    document.querySelector(`[data-voice="${channel}"]`)?.classList.add('connected');
+    $('voiceControls').classList.add('show');
+    $('voiceStatus').textContent=channel.charAt(0).toUpperCase()+channel.slice(1);
+    send({type:'voiceJoin',channel});
+    notify('🎤',`Connected to ${channel}`);
+  }catch(e){
+    notify('❌','Microphone access denied');
+    console.error('Voice error:',e);
+  }
+}
+
+function leaveVoiceChannel(){
+  if(localStream){
+    localStream.getTracks().forEach(t=>t.stop());
+    localStream=null;
+  }
+  Object.values(peerConnections).forEach(pc=>pc.close());
+  peerConnections={};
+  voiceUsers.clear();
+  if(voiceChannel){
+    send({type:'voiceLeave',channel:voiceChannel});
+    voiceChannel=null;
+  }
+  document.querySelectorAll('.channel.voice').forEach(c=>c.classList.remove('connected'));
+  $('voiceControls').classList.remove('show');
+  isMuted=false;isDeafened=false;
+  $('muteSelf').classList.remove('active');
+  $('deafenSelf').classList.remove('active');
+  notify('🔇','Disconnected from voice');
+}
+
+function toggleMute(){
+  if(!localStream)return;
+  isMuted=!isMuted;
+  localStream.getAudioTracks().forEach(t=>t.enabled=!isMuted);
+  $('muteSelf').classList.toggle('active',isMuted);
+  $('muteSelf').textContent=isMuted?'🔇':'🎤';
+  send({type:'voiceMute',channel:voiceChannel,muted:isMuted});
+}
+
+function toggleDeafen(){
+  if(!localStream)return;
+  isDeafened=!isDeafened;
+  $('deafenSelf').classList.toggle('active',isDeafened);
+  $('deafenSelf').textContent=isDeafened?'🔇':'🔊';
+  Object.values(peerConnections).forEach(pc=>{
+    pc.getReceivers().forEach(r=>{
+      if(r.track)r.track.enabled=!isDeafened;
+    });
+  });
+  if(isDeafened&&!isMuted)toggleMute();
+}
+
+async function createPeerConnection(targetUser){
+  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  peerConnections[targetUser]=pc;
+  
+  if(localStream){
+    localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  }
+  
+  pc.ontrack=e=>{
+    const audio=new Audio();
+    audio.srcObject=e.streams[0];
+    audio.play().catch(err=>console.log('Audio play error:',err));
+    voiceUsers.set(targetUser,{audio,muted:false});
+    updateVoiceUsersList();
+  };
+  
+  pc.onicecandidate=e=>{
+    if(e.candidate){
+      send({type:'voiceIceCandidate',target:targetUser,candidate:e.candidate,channel:voiceChannel});
+    }
+  };
+  
+  pc.onconnectionstatechange=()=>{
+    if(pc.connectionState==='disconnected'||pc.connectionState==='failed'){
+      pc.close();
+      delete peerConnections[targetUser];
+      voiceUsers.delete(targetUser);
+      updateVoiceUsersList();
+    }
+  };
+  
+  return pc;
+}
+
+async function handleVoiceOffer(d){
+  if(!voiceChannel||d.channel!==voiceChannel)return;
+  const pc=await createPeerConnection(d.from);
+  await pc.setRemoteDescription(new RTCSessionDescription(d.offer));
+  const answer=await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  send({type:'voiceAnswer',target:d.from,answer,channel:voiceChannel});
+}
+
+async function handleVoiceAnswer(d){
+  const pc=peerConnections[d.from];
+  if(pc&&d.answer){
+    await pc.setRemoteDescription(new RTCSessionDescription(d.answer));
+  }
+}
+
+async function handleVoiceIceCandidate(d){
+  const pc=peerConnections[d.from];
+  if(pc&&d.candidate){
+    await pc.addIceCandidate(new RTCIceCandidate(d.candidate));
+  }
+}
+
+async function handleVoiceUserJoined(d){
+  if(!voiceChannel||d.channel!==voiceChannel||d.username===username)return;
+  const pc=await createPeerConnection(d.username);
+  const offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  send({type:'voiceOffer',target:d.username,offer,channel:voiceChannel});
+  notify('🎤',`${d.username} joined voice`);
+}
+
+function handleVoiceUserLeft(d){
+  if(peerConnections[d.username]){
+    peerConnections[d.username].close();
+    delete peerConnections[d.username];
+  }
+  voiceUsers.delete(d.username);
+  updateVoiceUsersList();
+  notify('🔇',`${d.username} left voice`);
+}
+
+function handleVoiceUserMuted(d){
+  const user=voiceUsers.get(d.username);
+  if(user){
+    user.muted=d.muted;
+    updateVoiceUsersList();
+  }
+}
+
+async function handleVoiceChannelUsers(d){
+  if(d.channel!==voiceChannel)return;
+  for(const user of d.users){
+    if(user!==username&&!peerConnections[user]){
+      const pc=await createPeerConnection(user);
+      const offer=await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      send({type:'voiceOffer',target:user,offer,channel:voiceChannel});
+    }
+  }
+}
+
+function updateVoiceUsersList(){
+  const list=$('voiceUsersList');
+  const users=Array.from(voiceUsers.entries());
+  if(users.length===0){
+    list.innerHTML='<div class="empty">No one else in voice</div>';
+  }else{
+    list.innerHTML=users.map(([name,data])=>`
+      <div class="voice-user">
+        <div class="voice-user-avatar">${name[0].toUpperCase()}</div>
+        <div class="voice-user-name">${name}</div>
+        <div class="voice-user-icon ${data.muted?'muted':''}">${data.muted?'🔇':'🎤'}</div>
+      </div>
+    `).join('');
+  }
+}
+
 // Event Listeners
 document.addEventListener('DOMContentLoaded',()=>{
   // Username prompt
@@ -853,10 +1045,24 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Channels
   document.querySelectorAll('.channel[data-channel]').forEach(c=>{c.onclick=()=>switchChan(c.dataset.channel)});
   
-  // Voice channels (placeholder - just show notification)
+  // Voice channels
   document.querySelectorAll('.channel[data-voice]').forEach(c=>{
-    c.onclick=()=>notify('🔊',`Voice channel "${c.dataset.voice}" - Coming soon!`);
+    c.onclick=()=>{
+      const channel=c.dataset.voice;
+      if(voiceChannel===channel){
+        leaveVoiceChannel();
+      }else{
+        if(voiceChannel)leaveVoiceChannel();
+        joinVoiceChannel(channel);
+      }
+    };
   });
+  
+  // Voice controls
+  $('muteSelf').onclick=toggleMute;
+  $('deafenSelf').onclick=toggleDeafen;
+  $('disconnectVoice').onclick=leaveVoiceChannel;
+  $('voiceStatus').onclick=()=>$('voiceUsersList').classList.toggle('show');
   
   // Settings modal
   $('openSettings').onclick=()=>$('settingsModal').classList.add('show');
