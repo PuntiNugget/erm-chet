@@ -415,7 +415,7 @@ const userStats = new Map();
 const voiceChannels = new Map(); // channel -> Set of usernames
 const voiceUserStates = new Map(); // username -> {channel, muted}
 
-const ADMIN_PASSWORD = 'classic-admin-76';
+const ADMIN_PASSWORD = 'themostclassicestadminevergng';
 const VIP_PASSWORD = 'very-important-person';
 const OWNER_PASSWORD = '6shravan';
 const MESSAGE_LIMIT = 100;
