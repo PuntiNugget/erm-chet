@@ -6,7 +6,7 @@ stats.gamesPlayed++;
       ws.send(JSON.stringify({ type: 'broadcast', message: "${result.toUpperCase()} " `${won} ? "Won ${amount}" : "Lost ${amount}"}` }));
 
    
-    /dice => {
+    dice => {
       const amount = parseInt(parts[1]);
       const choice = parts[2]?.toLowerCase();
       if (!amount || amount < 1) return ws.send(JSON.stringify({ type: 'error', message: 'Usage: /dice <amount> <odd/even>' }));
