@@ -525,6 +525,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;h
 <div class="channel active" data-channel="general"><span class="channel-name">general</span></div>
 <div class="channel" data-channel="gaming"><span class="channel-name">gaming</span></div>
 <div class="channel" data-channel="memes"><span class="channel-name">memes</span></div>
+<div class="channel" data-channel="hub"><span class="channel-name">hub</span></div>
 </div>
 <div class="channel-section">
 <div class="section-header">Direct Messages</div>
@@ -1214,6 +1215,13 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('casinoModal').onclick=e=>{if(e.target===$('casinoModal'))$('casinoModal').classList.remove('show')};
   $('settingsModal').onclick=e=>{if(e.target===$('settingsModal'))$('settingsModal').classList.remove('show')};
 });
+
+  const hubButtons=[
+  {id:'youtube',label:'🎥 YouTube',url:'https://www.youtube.com/embed/dQw4w9WgXcQ'},
+  {id:'maps',label:'🗺️ Maps',url:'https://www.google.com/maps/embed?...'},
+  // Add more buttons here:
+  {id:'custom',label:'🎮 Your Label',url:'https://your-url-here.com'},
+];
 </script>
 </body>
 </html>
